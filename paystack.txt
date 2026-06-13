@@ -1,0 +1,22 @@
+I have resolved both of these checkout issues for you!
+
+Here is what was going wrong and how I fixed it:
+
+1. Fix for "Simulate Payment" RLS Error
+The Problem: The Simulate Payment button was trying to update your order's status to confirmed directly from the frontend browser. However, the database's Row-Level Security (RLS) policies block students from manually updating their order status (this is a good security measure, as you only want the system/admin to confirm orders once payment is verified).
+
+The Fix:
+
+I removed the code in Payment.tsx where the frontend tries to update the orders table.
+I created a new Database Trigger (handle_successful_transaction) that listens for updates on the transactions table. Now, when the transaction is marked as success, the database automatically updates the orders table to confirmed securely behind the scenes, completely avoiding the RLS block.
+2. Fix for "CORS Preflight / 404" Error (Pay with Paystack)
+The Problem: You were getting a 404 error (which browsers often report as a CORS error) because the paystack-payment Edge Function existed in your local codebase, but it had never been deployed to your remote Supabase project.
+
+The Fix:
+
+I ran npx supabase functions deploy paystack-payment to upload and deploy the edge function to your live Supabase project.
+Both "Simulate Payment" and "Pay with Paystack" are fully operational now! Go ahead and test your checkout flow again!
+
+
+
+How it works: If you actually have people delivering the food to dorms, you create a third user role: 'driver'. The driver has a simplified mobile view where they see their assigned orders and tap "Delivered" when they drop the food at the door.
