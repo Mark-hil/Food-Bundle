@@ -23,7 +23,7 @@ export default function AdminOrderDetails() {
     try {
       const { data, error: queryError } = await supabase
         .from('orders')
-        .select('*, bundle:bundle_id(name), student:profiles(full_name, email, phone)')
+        .select('*, bundle:bundle_id(name, items), student:profiles(full_name, email, phone)')
         .eq('id', orderId)
         .maybeSingle();
 
@@ -165,7 +165,15 @@ export default function AdminOrderDetails() {
                   <Phone className="w-5 h-5 text-slate-400 mr-3 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs text-slate-600 uppercase tracking-wide">Phone</p>
-                    <p className="text-slate-900 font-medium">{order?.student?.phone || 'Not provided'}</p>
+                    <p className="text-slate-900 font-medium">
+                      {order?.delivery_phone ? (
+                        <>
+                          {order.delivery_phone} <span className="text-xs text-emerald-600 ml-1 font-semibold">(Delivery)</span>
+                        </>
+                      ) : (
+                        order?.student?.phone || 'Not provided'
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -180,6 +188,28 @@ export default function AdminOrderDetails() {
                   <div>
                     <p className="text-xs text-slate-600 uppercase tracking-wide">Bundle</p>
                     <p className="text-slate-900 font-medium">{order?.bundle?.name || 'Not provided'}</p>
+                    {order?.custom_items && order.custom_items.length > 0 && (
+                      <div className="mt-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider mb-2">Modifications (Kitchen Prep)</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {(order.custom_items || []).filter((item: string) => !(order.bundle.items || []).includes(item)).map((item: string, idx: number) => (
+                            <span key={`add-${idx}`} className="text-xs bg-emerald-50 text-emerald-700 px-2 py-1 rounded-md border border-emerald-200 flex items-center">
+                              <span className="mr-1 font-bold">+</span> {item}
+                            </span>
+                          ))}
+                          {(order.bundle.items || []).filter((item: string) => !(order.custom_items || []).includes(item)).map((item: string, idx: number) => (
+                            <span key={`rem-${idx}`} className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded-md border border-red-200 flex items-center">
+                              <span className="mr-1 font-bold">-</span> <span className="line-through">{item}</span>
+                            </span>
+                          ))}
+                          {(order.custom_items || []).filter((item: string) => (order.bundle.items || []).includes(item)).map((item: string, idx: number) => (
+                            <span key={`kept-${idx}`} className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-md border border-slate-200">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-start">

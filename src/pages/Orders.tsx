@@ -116,6 +116,28 @@ export default function Orders() {
                     <h3 className="text-lg font-bold text-white">
                       {order.bundle.name}
                     </h3>
+                    {order.custom_items && order.custom_items.length > 0 && (
+                      <div className="mt-2 p-2 bg-black/20 rounded-lg border border-white/5">
+                        <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Modifications</div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {order.custom_items.filter(item => !(order.bundle.items || []).includes(item)).map((item, idx) => (
+                            <span key={`add-${idx}`} className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center">
+                              <span className="mr-1 font-bold">+</span> {item}
+                            </span>
+                          ))}
+                          {(order.bundle.items || []).filter(item => !(order.custom_items || []).includes(item)).map((item, idx) => (
+                            <span key={`rem-${idx}`} className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-md border border-red-500/20 flex items-center">
+                              <span className="mr-1 font-bold">-</span> <span className="line-through">{item}</span>
+                            </span>
+                          ))}
+                          {(order.custom_items || []).filter(item => (order.bundle.items || []).includes(item)).map((item, idx) => (
+                            <span key={`kept-${idx}`} className="text-[10px] bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded-md border border-slate-500/20">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(
                         order.status

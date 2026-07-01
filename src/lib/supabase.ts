@@ -20,6 +20,13 @@ export type Profile = {
   updated_at: string;
 };
 
+export type CustomizationOption = {
+  category: string;
+  options: string[];
+  required: boolean;
+  maxSelections: number;
+};
+
 export type Bundle = {
   id: string;
   name: string;
@@ -29,6 +36,8 @@ export type Bundle = {
   items: string[];
   available: boolean;
   delivery_days: string[];
+  is_customizable?: boolean;
+  customization_options?: CustomizationOption[];
   created_at: string;
   updated_at: string;
 };
@@ -46,6 +55,7 @@ export type Order = {
   delivery_time?: string;
   notes?: string;
   pickup_pin?: string;
+  custom_items?: string[];
   created_at: string;
   updated_at: string;
 };

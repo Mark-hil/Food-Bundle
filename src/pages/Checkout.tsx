@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase, Bundle } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '../lib/navigation';
-import { ArrowLeft, Calendar, MapPin, Gift } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Gift, Phone } from 'lucide-react';
 import { Link } from '../lib/navigation';
 
 export default function Checkout() {
@@ -11,6 +11,7 @@ export default function Checkout() {
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
+  const [deliveryPhone, setDeliveryPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [promoCode, setPromoCode] = useState('');
   const [promoDiscount, setPromoDiscount] = useState(0);
@@ -24,6 +25,15 @@ export default function Checkout() {
   const [pointsToUse, setPointsToUse] = useState(0);
   const [pointsDiscount, setPointsDiscount] = useState(0);
   const [isSubscription, setIsSubscription] = useState(false);
+  const [deliveryFee, setDeliveryFee] = useState(15);
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(700);
+  const [subFoodDiscountPercent, setSubFoodDiscountPercent] = useState(40);
+  const [subDeliveryDiscountPercent, setSubDeliveryDiscountPercent] = useState(20);
+  const [loyaltyEarnStepAmount, setLoyaltyEarnStepAmount] = useState(10);
+  const [loyaltyEarnStepPoints, setLoyaltyEarnStepPoints] = useState(10);
+  const [loyaltyRedemptionRatio, setLoyaltyRedemptionRatio] = useState(100);
+  const [loyaltyMinPointsToRedeem, setLoyaltyMinPointsToRedeem] = useState(500);
+  const [customItems, setCustomItems] = useState<string[]>([]);
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -32,9 +42,21 @@ export default function Checkout() {
     const bundleId = urlParams.get('bundle');
     const reorder = urlParams.get('reorder');
     const subscribeParam = urlParams.get('subscribe');
+    const customParam = urlParams.get('custom');
     
     if (subscribeParam === 'true') {
       setIsSubscription(true);
+    }
+
+    if (customParam) {
+      const stored = sessionStorage.getItem(`custom_bundle_${customParam}`);
+      if (stored) {
+        try {
+          setCustomItems(JSON.parse(stored));
+        } catch (e) {
+          console.error('Failed to parse custom items', e);
+        }
+      }
     }
     
     if (bundleId) {
@@ -42,13 +64,31 @@ export default function Checkout() {
       if (reorder === 'true') {
         loadLastOrderAddress();
       }
+      loadSettings();
     } else {
       navigate('/');
     }
     if (user) {
       loadLoyaltyPoints();
+      loadProfilePhone();
     }
   }, [user]);
+
+  const loadProfilePhone = async () => {
+    if (!user) return;
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('phone')
+        .eq('id', user.id)
+        .single();
+      if (!error && data?.phone) {
+        setDeliveryPhone(data.phone);
+      }
+    } catch (error) {
+      console.error('Error loading profile phone:', error);
+    }
+  };
 
   const loadBundle = async (bundleId: string) => {
     try {
@@ -69,6 +109,28 @@ export default function Checkout() {
       navigate('/');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      if (!error && data) {
+        setDeliveryFee(Number(data.delivery_charge));
+        setFreeDeliveryThreshold(Number(data.free_delivery_threshold || 700));
+        setSubFoodDiscountPercent(Number(data.subscription_food_discount_percent || 40));
+        setSubDeliveryDiscountPercent(Number(data.subscription_delivery_discount_percent || 20));
+        setLoyaltyEarnStepAmount(Number(data.loyalty_earn_step_amount || 10));
+        setLoyaltyEarnStepPoints(Number(data.loyalty_earn_step_points || 10));
+        setLoyaltyRedemptionRatio(Number(data.loyalty_redemption_ratio || 100));
+        setLoyaltyMinPointsToRedeem(Number(data.loyalty_min_points_to_redeem || 500));
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
     }
   };
 
@@ -185,11 +247,12 @@ export default function Checkout() {
   };
 
   const applyLoyaltyPoints = () => {
+    if (loyaltyPoints < loyaltyMinPointsToRedeem) return;
     if (!usePoints) {
       setUsePoints(true);
-      const maxPoints = Math.min(loyaltyPoints, Math.floor((Number(bundle!.price) * quantity) / 100) * 100);
+      const maxPoints = Math.min(loyaltyPoints, Math.floor((Number(bundle!.price) * quantity) / loyaltyRedemptionRatio) * loyaltyRedemptionRatio);
       setPointsToUse(maxPoints);
-      setPointsDiscount(maxPoints / 100);
+      setPointsDiscount(maxPoints / loyaltyRedemptionRatio);
     } else {
       setUsePoints(false);
       setPointsToUse(0);
@@ -200,7 +263,7 @@ export default function Checkout() {
   const updatePointsAmount = (points: number) => {
     const capped = Math.min(points, loyaltyPoints);
     const subtotal = Number(bundle!.price) * quantity * (isSubscription ? 3 : 1);
-    const maxDiscount = Math.min(capped / 100, subtotal);
+    const maxDiscount = Math.min(capped / loyaltyRedemptionRatio, subtotal);
     setPointsToUse(capped);
     setPointsDiscount(maxDiscount);
   };
@@ -213,14 +276,17 @@ export default function Checkout() {
     setSubmitting(true);
 
     try {
-      const DELIVERY_FEE = 15;
       const deliveryCount = isSubscription ? 3 : 1;
-      const baseDeliveryCost = DELIVERY_FEE * deliveryCount;
-      const subDeliveryDiscount = isSubscription ? baseDeliveryCost * 0.20 : 0;
-      const finalDeliveryCost = baseDeliveryCost - subDeliveryDiscount;
-
+      const baseDeliveryCost = deliveryFee * deliveryCount;
       const subtotal = Number(bundle.price) * quantity * (isSubscription ? 3 : 1);
-      const subscriptionDiscount = isSubscription ? subtotal * 0.05 : 0;
+
+      const isFreeDelivery = subtotal >= freeDeliveryThreshold;
+      const subDeliveryDiscount = (!isFreeDelivery && isSubscription) ? baseDeliveryCost * (subDeliveryDiscountPercent / 100) : 0;
+      const freeDeliveryDiscount = isFreeDelivery ? baseDeliveryCost : 0;
+      
+      const finalDeliveryCost = baseDeliveryCost - subDeliveryDiscount - freeDeliveryDiscount;
+
+      const subscriptionDiscount = isSubscription ? subtotal * (subFoodDiscountPercent / 100) : 0;
       const totalDiscount = promoDiscount + pointsDiscount + subscriptionDiscount;
       const totalAmount = Math.max(0, subtotal + finalDeliveryCost - totalDiscount);
 
@@ -239,7 +305,8 @@ export default function Checkout() {
             status: 'active',
             next_delivery_date: deliveryDate || new Date().toISOString().split('T')[0],
             duration_months: 3,
-            deliveries_made: 0
+            deliveries_made: 0,
+            custom_items: customItems.length > 0 ? customItems : null
           })
           .select()
           .single();
@@ -262,6 +329,8 @@ export default function Checkout() {
           notes: isSubscription ? `[SEMESTER SUBSCRIPTION: Delivery 1 of 3] ${notes}`.trim() : (notes || null),
           status: 'pending',
           pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(),
+          custom_items: customItems.length > 0 ? customItems : null,
+          delivery_phone: deliveryPhone || null
         })
         .select()
         .single();
@@ -280,7 +349,7 @@ export default function Checkout() {
       if (transactionError) throw transactionError;
 
       // Award loyalty points
-      const pointsEarned = Math.floor(totalAmount / 100) * 10;
+      const pointsEarned = Math.floor(totalAmount / loyaltyEarnStepAmount) * loyaltyEarnStepPoints;
       if (pointsEarned > 0) {
         try {
           // Get current balance
@@ -353,14 +422,17 @@ export default function Checkout() {
 
   if (!bundle) return null;
 
-  const DELIVERY_FEE = 15;
   const deliveryCount = isSubscription ? 3 : 1;
-  const baseDeliveryCost = DELIVERY_FEE * deliveryCount;
-  const subDeliveryDiscount = isSubscription ? baseDeliveryCost * 0.20 : 0;
-  const finalDeliveryCost = baseDeliveryCost - subDeliveryDiscount;
-
+  const baseDeliveryCost = deliveryFee * deliveryCount;
   const subtotal = Number(bundle.price) * quantity * (isSubscription ? 3 : 1);
-  const subscriptionDiscount = isSubscription ? subtotal * 0.05 : 0;
+
+  const isFreeDelivery = subtotal >= freeDeliveryThreshold;
+  const subDeliveryDiscount = (!isFreeDelivery && isSubscription) ? baseDeliveryCost * (subDeliveryDiscountPercent / 100) : 0;
+  const freeDeliveryDiscount = isFreeDelivery ? baseDeliveryCost : 0;
+  
+  const finalDeliveryCost = baseDeliveryCost - subDeliveryDiscount - freeDeliveryDiscount;
+
+  const subscriptionDiscount = isSubscription ? subtotal * (subFoodDiscountPercent / 100) : 0;
   const totalDiscount = promoDiscount + pointsDiscount + subscriptionDiscount;
   const totalAmount = Math.max(0, subtotal + finalDeliveryCost - totalDiscount);
 
@@ -421,6 +493,21 @@ export default function Checkout() {
                 className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500"
                 rows={3}
                 placeholder="Enter your delivery address on campus"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
+                <Phone className="w-4 h-4 mr-1 text-emerald-400" />
+                Delivery Phone Number
+              </label>
+              <input
+                type="tel"
+                value={deliveryPhone}
+                onChange={(e) => setDeliveryPhone(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500"
+                placeholder="0244123456"
                 required
               />
             </div>
@@ -508,7 +595,7 @@ export default function Checkout() {
                 <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4 mb-3">
                   <p className="text-sm text-gray-400 mb-3">
                     You have <span className="font-bold text-purple-400">{loyaltyPoints} points</span>
-                    <span className="text-gray-500 block text-xs mt-1">(100 points = GH₵ 1 discount)</span>
+                    <span className="text-gray-500 block text-xs mt-1">({loyaltyRedemptionRatio} points = GH₵ 1 discount. Minimum {loyaltyMinPointsToRedeem} points to redeem)</span>
                   </p>
                   <div className="flex items-center gap-3">
                     <input
@@ -516,10 +603,11 @@ export default function Checkout() {
                       id="usePoints"
                       checked={usePoints}
                       onChange={applyLoyaltyPoints}
-                      className="w-4 h-4 text-purple-500 rounded border-gray-600 bg-slate-800 focus:ring-purple-500 focus:ring-offset-slate-900"
+                      disabled={loyaltyPoints < loyaltyMinPointsToRedeem}
+                      className="w-4 h-4 text-purple-500 rounded border-gray-600 bg-slate-800 focus:ring-purple-500 focus:ring-offset-slate-900 disabled:opacity-50"
                     />
-                    <label htmlFor="usePoints" className="text-sm text-gray-300 flex-1">
-                      Redeem loyalty points for discount
+                    <label htmlFor="usePoints" className={`text-sm flex-1 ${loyaltyPoints < loyaltyMinPointsToRedeem ? 'text-gray-500' : 'text-gray-300'}`}>
+                      Redeem loyalty points for discount {loyaltyPoints < loyaltyMinPointsToRedeem && `(Need ${loyaltyMinPointsToRedeem}+)`}
                     </label>
                   </div>
                   {usePoints && (
@@ -573,17 +661,26 @@ export default function Checkout() {
             </div>
             <div className="flex justify-between text-gray-300 pt-2 border-t border-white/5 mt-2">
               <span>Delivery Fee {isSubscription && '(×3 Deliveries)'}</span>
-              <span className="text-white font-medium">GH₵ {baseDeliveryCost.toFixed(2)}</span>
+              <span className="text-white font-medium">
+                {isFreeDelivery ? <span className="line-through text-gray-500 mr-2">GH₵ {baseDeliveryCost.toFixed(2)}</span> : null}
+                GH₵ {finalDeliveryCost.toFixed(2)}
+              </span>
             </div>
+            {freeDeliveryDiscount > 0 && (
+              <div className="flex justify-between text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-md mt-1">
+                <span>🎉 Free Delivery Applied!</span>
+                <span>-GH₵ {freeDeliveryDiscount.toFixed(2)}</span>
+              </div>
+            )}
             {subDeliveryDiscount > 0 && (
-              <div className="flex justify-between text-emerald-400 font-semibold">
-                <span>Subscriber Delivery Discount (20%)</span>
+              <div className="flex justify-between text-emerald-400 font-semibold mt-1">
+                <span>Subscriber Delivery Discount ({subDeliveryDiscountPercent}%)</span>
                 <span>-GH₵ {subDeliveryDiscount.toFixed(2)}</span>
               </div>
             )}
             {subscriptionDiscount > 0 && (
               <div className="flex justify-between text-purple-400 font-semibold pt-2 border-t border-white/5 mt-2">
-                <span>Semester Food Discount (5%)</span>
+                <span>Semester Food Discount ({subFoodDiscountPercent}%)</span>
                 <span>-GH₵ {subscriptionDiscount.toFixed(2)}</span>
               </div>
             )}
@@ -606,15 +703,42 @@ export default function Checkout() {
           </div>
 
           <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-sm text-gray-400">
-            <p className="font-semibold text-white mb-3">What's included:</p>
-            <ul className="space-y-2">
-              {bundle.items?.map((item, index) => (
-                <li key={index} className="flex items-center">
-                  <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></span>
-                  {item}
-                </li>
-              )) || <li>Meal items as described</li>}
-            </ul>
+            <p className="font-semibold text-white mb-3">
+              What's included {customItems.length > 0 ? '(Customized)' : ''}:
+            </p>
+            {customItems.length > 0 ? (
+              <div className="space-y-3">
+                <ul className="space-y-2">
+                  {(bundle.items || []).filter(item => customItems.includes(item)).map((item, index) => (
+                    <li key={`kept-${index}`} className="flex items-center text-gray-300">
+                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-2"></span>
+                      {item}
+                    </li>
+                  ))}
+                  {customItems.filter(item => !(bundle.items || []).includes(item)).map((item, index) => (
+                    <li key={`added-${index}`} className="flex items-center text-emerald-400">
+                      <span className="text-emerald-400 font-bold mr-2">+</span>
+                      {item} <span className="ml-2 text-xs bg-emerald-500/10 px-1.5 py-0.5 rounded text-emerald-400">Added</span>
+                    </li>
+                  ))}
+                  {(bundle.items || []).filter(item => !customItems.includes(item)).map((item, index) => (
+                    <li key={`removed-${index}`} className="flex items-center text-gray-500 line-through">
+                      <span className="text-red-400 font-bold mr-2 no-underline">-</span>
+                      {item} <span className="ml-2 text-xs bg-red-500/10 px-1.5 py-0.5 rounded text-red-400 no-underline">Removed</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <ul className="space-y-2">
+                {bundle.items?.map((item, index) => (
+                  <li key={index} className="flex items-center">
+                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></span>
+                    {item}
+                  </li>
+                )) || <li>Meal items as described</li>}
+              </ul>
+            )}
           </div>
         </div>
       </div>

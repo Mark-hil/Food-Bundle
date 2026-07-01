@@ -16,6 +16,8 @@ export default function GuestCheckout() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [deliveryFee, setDeliveryFee] = useState(15);
+  const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(700);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -23,6 +25,7 @@ export default function GuestCheckout() {
     const bundleId = urlParams.get('bundle');
     if (bundleId) {
       loadBundle(bundleId);
+      loadSettings();
     } else {
       navigate('/packages');
     }
@@ -51,6 +54,22 @@ export default function GuestCheckout() {
     }
   };
 
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+      if (!error && data) {
+        setDeliveryFee(Number(data.delivery_charge));
+        setFreeDeliveryThreshold(Number(data.free_delivery_threshold || 700));
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!bundle) return;
@@ -59,8 +78,10 @@ export default function GuestCheckout() {
     setSubmitting(true);
 
     try {
-      const DELIVERY_FEE = 15;
-      const totalAmount = Number(bundle.price) * quantity + DELIVERY_FEE;
+      const subtotal = Number(bundle.price) * quantity;
+      const isFreeDelivery = subtotal >= freeDeliveryThreshold;
+      const finalDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+      const totalAmount = subtotal + finalDeliveryFee;
 
       const { data: orderData, error: orderError } = await supabase
         .from('guest_orders')
@@ -71,7 +92,7 @@ export default function GuestCheckout() {
           phone,
           quantity,
           total_amount: totalAmount,
-          delivery_fee: DELIVERY_FEE,
+          delivery_fee: finalDeliveryFee,
           delivery_address: deliveryAddress,
           delivery_date: deliveryDate || null,
           delivery_time: deliveryTime || null,
@@ -103,8 +124,10 @@ export default function GuestCheckout() {
 
   if (!bundle) return null;
 
-  const DELIVERY_FEE = 15;
-  const totalAmount = Number(bundle.price) * quantity + DELIVERY_FEE;
+  const subtotal = Number(bundle.price) * quantity;
+  const isFreeDelivery = subtotal >= freeDeliveryThreshold;
+  const finalDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
+  const totalAmount = subtotal + finalDeliveryFee;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-12">
@@ -274,8 +297,17 @@ export default function GuestCheckout() {
                 </div>
                 <div className="flex justify-between text-gray-300 border-t border-white/10 pt-2 mt-2">
                   <span>Delivery Fee</span>
-                  <span>GH₵ {DELIVERY_FEE.toFixed(2)}</span>
+                  <span className="text-white font-medium">
+                    {isFreeDelivery ? <span className="line-through text-gray-500 mr-2">GH₵ {deliveryFee.toFixed(2)}</span> : null}
+                    GH₵ {finalDeliveryFee.toFixed(2)}
+                  </span>
                 </div>
+                {isFreeDelivery && (
+                  <div className="flex justify-between text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-md mt-1">
+                    <span>🎉 Free Delivery Applied!</span>
+                    <span>-GH₵ {deliveryFee.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="border-t border-white/10 pt-3 flex justify-between text-lg font-bold text-white">
                   <span>Total Amount</span>
                   <span className="text-emerald-400">GH₵ {totalAmount.toFixed(2)}</span>

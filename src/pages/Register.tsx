@@ -68,7 +68,7 @@ export default function Register() {
             {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold text-white mb-2">Create Account</h1>
-              <p className="text-gray-300">Join UENR Food Bundle System</p>
+              <p className="text-gray-300">Join Food Bundle System</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -127,7 +127,7 @@ export default function Register() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 focus:bg-white/20 transition"
-                    placeholder="you@uenr.edu.gh"
+                    placeholder="you@gmail.com"
                     required
                   />
                 </div>
@@ -136,7 +136,7 @@ export default function Register() {
               {/* Phone */}
               <div className="animate-in" style={{ animationDelay: '0.25s' }}>
                 <label htmlFor="phone" className="block text-sm font-medium text-white mb-2">
-                  Phone Number (Optional)
+                  Phone Number 
                 </label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-3.5 text-blue-400" size={20} />
@@ -147,6 +147,7 @@ export default function Register() {
                     onChange={(e) => setPhone(e.target.value)}
                     className="w-full pl-10 pr-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 focus:bg-white/20 transition"
                     placeholder="0244123456"
+                    required
                   />
                 </div>
               </div>

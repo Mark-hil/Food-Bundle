@@ -26,8 +26,8 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', label: 'Bundles', icon: UtensilsCrossed },
     { path: '/orders', label: 'My Orders', icon: Package },
     { path: '/subscriptions', label: 'Subscriptions', icon: RefreshCw },
-    { path: '/loyalty', label: 'Points', icon: Trophy },
-    { path: '/referrals', label: 'Referrals', icon: Gift },
+    // { path: '/loyalty', label: 'Points', icon: Trophy },
+    // { path: '/referrals', label: 'Referrals', icon: Gift },
     { path: '/profile', label: 'Profile', icon: User },
   ];
 

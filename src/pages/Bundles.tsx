@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase, Bundle } from '../lib/supabase';
 import { useNavigate } from '../lib/navigation';
-import { ShoppingCart, Clock, CheckCircle, Star } from 'lucide-react';
+import { ShoppingCart, Clock, CheckCircle, Star, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import CustomizationModal from '../components/CustomizationModal';
 
 interface BundleWithRating extends Bundle {
   averageRating?: number;
@@ -15,6 +16,8 @@ export default function Bundles() {
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [customizingBundle, setCustomizingBundle] = useState<Bundle | null>(null);
+  const [isSubscribing, setIsSubscribing] = useState(false);
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -115,6 +118,23 @@ export default function Bundles() {
     );
   }
 
+  const handleActionClick = (bundle: BundleWithRating, subscribe: boolean) => {
+    if (bundle.is_customizable && bundle.customization_options && bundle.customization_options.length > 0) {
+      setCustomizingBundle(bundle);
+      setIsSubscribing(subscribe);
+    } else {
+      navigate(`/checkout?bundle=${bundle.id}${subscribe ? '&subscribe=true' : ''}`);
+    }
+  };
+
+  const handleCustomizationConfirm = (customItems: string[]) => {
+    if (!customizingBundle) return;
+    const customId = crypto.randomUUID();
+    sessionStorage.setItem(`custom_bundle_${customId}`, JSON.stringify(customItems));
+    navigate(`/checkout?bundle=${customizingBundle.id}&custom=${customId}${isSubscribing ? '&subscribe=true' : ''}`);
+    setCustomizingBundle(null);
+  };
+
   return (
     <div>
       <div className="mb-8">
@@ -155,10 +175,26 @@ export default function Bundles() {
                 </p>
 
                 <div className="mb-4">
-                  <div className="flex items-center text-sm text-gray-300 mb-2">
-                    <CheckCircle className="w-4 h-4 mr-2 text-emerald-400" />
-                    <span>{bundle.items?.length || 0} items included</span>
-                  </div>
+                  {bundle.items && bundle.items.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {bundle.items.map((item, idx) => (
+                        <span key={idx} className="text-[10px] bg-white/10 text-gray-200 px-2 py-1 rounded-md border border-white/10">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-sm text-gray-300 mb-2">
+                      <CheckCircle className="w-4 h-4 mr-2 text-emerald-400" />
+                      <span>0 items included</span>
+                    </div>
+                  )}
+                  {bundle.is_customizable && (
+                    <div className="flex items-center text-sm text-blue-300 mb-2 font-medium">
+                      <Settings className="w-4 h-4 mr-2" />
+                      <span>Customizable Bundle</span>
+                    </div>
+                  )}
                   <div className="flex items-center text-sm text-gray-300">
                     <Clock className="w-4 h-4 mr-2 text-blue-400" />
                     <span>Delivery: {bundle.delivery_days?.join(', ') || 'Weekdays'}</span>
@@ -183,16 +219,16 @@ export default function Bundles() {
                       Rate
                     </button>
                     <button
-                      onClick={() => navigate(`/checkout?bundle=${bundle.id}&subscribe=true`)}
+                      onClick={() => handleActionClick(bundle, true)}
                       className="bg-gradient-to-r from-purple-500 to-pink-500 hover:shadow-lg hover:shadow-purple-500/50 text-white font-semibold px-4 py-2 rounded-lg transition transform hover:scale-105 text-sm"
                     >
                       Subscribe
                     </button>
                     <button
-                      onClick={() => navigate(`/checkout?bundle=${bundle.id}`)}
+                      onClick={() => handleActionClick(bundle, false)}
                       className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-semibold px-4 py-2 rounded-lg transition transform hover:scale-105 text-sm"
                     >
-                      Order Now
+                      {bundle.is_customizable ? 'Customize & Order' : 'Order Now'}
                     </button>
                   </div>
                 </div>
@@ -255,6 +291,15 @@ export default function Bundles() {
             </div>
           ))}
         </div>
+      )}
+
+      {customizingBundle && (
+        <CustomizationModal
+          bundle={customizingBundle}
+          isOpen={!!customizingBundle}
+          onClose={() => setCustomizingBundle(null)}
+          onConfirm={handleCustomizationConfirm}
+        />
       )}
     </div>
   );

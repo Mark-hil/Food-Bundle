@@ -158,31 +158,30 @@ export default function Home() {
                 {packages.map((pkg, idx) => (
                   <div
                     key={pkg.id}
-                    className="group animate-in"
+                    className="group animate-in flex"
                     style={{ animationDelay: `${0.2 + idx * 0.15}s` }}
                   >
-                    <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/50 transition-all duration-300 transform hover:scale-105 cursor-pointer">
-                      {/* Image */}
+                    <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/50 transition-all duration-300 transform hover:scale-105 cursor-pointer flex flex-col relative">
+                      {/* Badge */}
+                      <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-4 py-1 rounded-full text-xs font-bold z-10 shadow-lg">
+                        {pkg.name === 'ALPHA' && '⭐ Premium'}
+                        {pkg.name === 'BETA' && '⭐ Popular'}
+                        {pkg.name === 'GAMMA' && '⭐ Essential'}
+                      </div>
+
+                      {/* Image Display */}
                       {pkg.image_url && (
-                        <div className="relative overflow-hidden h-56">
-                          <img
-                            src={pkg.image_url}
-                            alt={pkg.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                            loading="lazy"
+                        <div className="w-full h-48 overflow-hidden relative">
+                          <img 
+                            src={pkg.image_url} 
+                            alt={pkg.name} 
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           />
-                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
                         </div>
                       )}
 
-                      <div className="p-8 relative">
-                        {/* Badge */}
-                        <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-4 py-1 rounded-full text-xs font-bold">
-                          {pkg.name === 'ALPHA' && '⭐ Premium'}
-                          {pkg.name === 'BETA' && '⭐ Popular'}
-                          {pkg.name === 'GAMMA' && '⭐ Essential'}
-                        </div>
-
+                      <div className="p-8 flex flex-col flex-grow relative">
                         {/* Header */}
                         <div className="mb-4">
                           <h3 className="text-2xl font-bold text-white mb-2">{pkg.name}</h3>
@@ -190,7 +189,7 @@ export default function Home() {
                         </div>
 
                         {/* Items List */}
-                        <div className="mb-6 bg-white/5 p-4 rounded-lg">
+                        <div className="mb-6 bg-white/5 p-4 rounded-lg flex-grow">
                           <p className="text-xs font-semibold text-blue-400 mb-3 uppercase tracking-wider">Includes</p>
                           <ul className="space-y-2">
                             {Array.isArray(pkg.items) && pkg.items.map((item: string, i: number) => (
@@ -203,10 +202,10 @@ export default function Home() {
                         </div>
 
                         {/* Price */}
-                        <div className="mb-6 pb-6 border-b border-white/10">
+                        <div className="mb-6 pb-6 border-b border-white/10 mt-auto">
                           <p className="text-gray-400 text-xs mb-1">Price</p>
                           <p className="text-4xl font-bold text-white">
-                            GH₵ {(pkg.price / 1000).toFixed(0)}
+                            GH₵ {Number(pkg.price).toFixed(0)}
                           </p>
                         </div>
 

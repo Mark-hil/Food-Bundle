@@ -1,39 +1,132 @@
-import { useState } from 'react';
-import { Save, Building2, Truck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Save, Building2, Truck, Percent } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
 
 export default function Settings() {
   const [settings, setSettings] = useState({
     siteName: 'FoodBundle',
     supportEmail: 'support@foodbundle.com',
     phone: '+1 (555) 123-4567',
-    deliveryCharge: '5.00',
+    deliveryCharge: '15.00',
     minOrderValue: '20.00',
     businessHours: '9:00 AM - 6:00 PM',
+    freeDeliveryThreshold: '700.00',
+    subscriptionFoodDiscountPercent: '40',
+    subscriptionDeliveryDiscountPercent: '20',
+    loyaltyEarnStepAmount: '10.00',
+    loyaltyEarnStepPoints: '10',
+    loyaltyRedemptionRatio: '100',
+    loyaltyMinPointsToRedeem: '500',
   });
 
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
+
+  const fetchSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('*')
+        .eq('id', 1)
+        .single();
+
+      if (error) {
+        if (error.code !== 'PGRST116') throw error;
+      } else if (data) {
+        setSettings({
+          siteName: data.site_name,
+          supportEmail: data.support_email,
+          phone: data.phone,
+          deliveryCharge: Number(data.delivery_charge).toFixed(2),
+          minOrderValue: Number(data.min_order_value).toFixed(2),
+          businessHours: data.business_hours,
+          freeDeliveryThreshold: Number(data.free_delivery_threshold || 700).toFixed(2),
+          subscriptionFoodDiscountPercent: Number(data.subscription_food_discount_percent || 40).toString(),
+          subscriptionDeliveryDiscountPercent: Number(data.subscription_delivery_discount_percent || 20).toString(),
+          loyaltyEarnStepAmount: Number(data.loyalty_earn_step_amount || 10).toFixed(2),
+          loyaltyEarnStepPoints: Number(data.loyalty_earn_step_points || 10).toString(),
+          loyaltyRedemptionRatio: Number(data.loyalty_redemption_ratio || 100).toString(),
+          loyaltyMinPointsToRedeem: Number(data.loyalty_min_points_to_redeem || 500).toString(),
+        });
+      }
+    } catch (err: any) {
+      console.error('Error fetching settings:', err);
+      setError('Failed to load settings');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setSettings(prev => ({ ...prev, [name]: value }));
     setSuccess(false);
+    setError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
+    setError(null);
 
-    setTimeout(() => {
-      setSaving(false);
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .update({
+          site_name: settings.siteName,
+          support_email: settings.supportEmail,
+          phone: settings.phone,
+          delivery_charge: Number(settings.deliveryCharge),
+          min_order_value: Number(settings.minOrderValue),
+          business_hours: settings.businessHours,
+          free_delivery_threshold: Number(settings.freeDeliveryThreshold),
+          subscription_food_discount_percent: Number(settings.subscriptionFoodDiscountPercent),
+          subscription_delivery_discount_percent: Number(settings.subscriptionDeliveryDiscountPercent),
+          loyalty_earn_step_amount: Number(settings.loyaltyEarnStepAmount),
+          loyalty_earn_step_points: Number(settings.loyaltyEarnStepPoints),
+          loyalty_redemption_ratio: Number(settings.loyaltyRedemptionRatio),
+          loyalty_min_points_to_redeem: Number(settings.loyaltyMinPointsToRedeem),
+        })
+        .eq('id', 1);
+
+      if (error) throw error;
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
-    }, 1000);
+    } catch (err: any) {
+      console.error('Error saving settings:', err);
+      setError(err.message || 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-green-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        {error && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl mb-6 flex items-start gap-3 border border-red-200">
+            <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span>{error}</span>
+          </div>
+        )}
+
         {success && (
           <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-green-700 flex items-start gap-3">
             <div className="w-5 h-5 flex-shrink-0 mt-0.5">
@@ -140,6 +233,131 @@ export default function Settings() {
                     step="0.01"
                     className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center mb-6">
+                <Percent className="w-5 h-5 text-green-600 mr-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Discount & Threshold Settings</h2>
+              </div>
+              <div className="border-t border-slate-200 pt-6 space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Free Delivery Threshold (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="freeDeliveryThreshold"
+                    value={settings.freeDeliveryThreshold}
+                    onChange={handleChange}
+                    step="0.01"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Orders above this amount will have a zero delivery fee.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Semester Food Discount (%)
+                  </label>
+                  <input
+                    type="number"
+                    name="subscriptionFoodDiscountPercent"
+                    value={settings.subscriptionFoodDiscountPercent}
+                    onChange={handleChange}
+                    step="1"
+                    min="0"
+                    max="100"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Percentage off the food bundle price for subscribers.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Subscriber Delivery Discount (%)
+                  </label>
+                  <input
+                    type="number"
+                    name="subscriptionDeliveryDiscountPercent"
+                    value={settings.subscriptionDeliveryDiscountPercent}
+                    onChange={handleChange}
+                    step="1"
+                    min="0"
+                    max="100"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Percentage off the delivery fee for subscribers (if they don't qualify for Free Delivery).</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center mb-6">
+                <Percent className="w-5 h-5 text-purple-600 mr-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Loyalty Program Settings</h2>
+              </div>
+              <div className="border-t border-slate-200 pt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Spend Amount Step (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="loyaltyEarnStepAmount"
+                    value={settings.loyaltyEarnStepAmount}
+                    onChange={handleChange}
+                    step="0.01"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Amount to spend to earn a chunk of points.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Points Earned per Step
+                  </label>
+                  <input
+                    type="number"
+                    name="loyaltyEarnStepPoints"
+                    value={settings.loyaltyEarnStepPoints}
+                    onChange={handleChange}
+                    step="1"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Points awarded for every chunk spent.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Points to Cedi Ratio
+                  </label>
+                  <input
+                    type="number"
+                    name="loyaltyRedemptionRatio"
+                    value={settings.loyaltyRedemptionRatio}
+                    onChange={handleChange}
+                    step="1"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">How many points equal GH₵ 1 discount.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Minimum Points to Redeem
+                  </label>
+                  <input
+                    type="number"
+                    name="loyaltyMinPointsToRedeem"
+                    value={settings.loyaltyMinPointsToRedeem}
+                    onChange={handleChange}
+                    step="1"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Minimum points balance required to claim a discount.</p>
                 </div>
               </div>
             </div>

@@ -151,10 +151,21 @@ export default function Packages() {
                     </div>
                   </div>
 
-                  {/* Title & Description */}
+                  {/* Image Display */}
+                  {bundle?.image_url && (
+                    <div className="w-full h-48 mb-6 rounded-xl overflow-hidden relative group">
+                      <img 
+                        src={bundle.image_url} 
+                        alt={pkg.displayName} 
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent"></div>
+                    </div>
+                  )}
+
                   <h3 className="text-3xl font-bold mb-2 text-white">{pkg.displayName}</h3>
                   <p className={`mb-6 text-sm ${pkg.highlight ? 'text-emerald-100' : 'text-gray-300'}`}>
-                    {pkg.badge} food bundle
+                    {bundle ? bundle.description : `${pkg.badge} food bundle`}
                   </p>
 
                   {/* Price */}
@@ -198,7 +209,7 @@ export default function Packages() {
                   {/* Items List */}
                   <div className="space-y-3">
                     <h4 className="text-sm font-semibold text-gray-200 uppercase tracking-wide">What's Included</h4>
-                    {pkg.items.map((item, itemIdx) => (
+                    {(bundle?.items || pkg.items).map((item: string, itemIdx: number) => (
                       <div key={itemIdx} className="flex gap-3 items-start">
                         <Check size={18} className="text-emerald-400 flex-shrink-0 mt-0.5" />
                         <span className="text-gray-300 text-sm">{item}</span>

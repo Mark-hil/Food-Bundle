@@ -125,9 +125,9 @@ export default function PromoCodes() {
       setShowModal(false);
       setSuccess('Promo code created successfully!');
       setTimeout(() => setSuccess(''), 3000);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating promo code:', error);
-      setError('Failed to create promo code');
+      setError(error.message || 'Failed to create promo code');
     } finally {
       setSubmitting(false);
     }

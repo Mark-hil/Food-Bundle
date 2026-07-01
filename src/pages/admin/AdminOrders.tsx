@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, X, Loader, Lock, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, X, Loader, Lock, CheckCircle2, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
 
 interface OrderWithDetails {
   id: string;
@@ -15,8 +15,11 @@ interface OrderWithDetails {
   pickup_pin?: string;
   created_at: string;
   source: 'registered' | 'guest';
+  custom_items?: string[];
+  delivery_phone?: string;
   bundle: {
     name: string;
+    items?: string[];
   };
   student?: {
     full_name: string;
@@ -93,7 +96,7 @@ export default function AdminOrders() {
           .from('orders')
           .select(`
             *,
-            bundle:bundles(name),
+            bundle:bundles(name, items),
             profiles(full_name, email, phone, student_id)
           `)
           .order('created_at', { ascending: false });
@@ -122,7 +125,7 @@ export default function AdminOrders() {
           .from('guest_orders')
           .select(`
             *,
-            bundle:bundles(name)
+            bundle:bundles(name, items)
           `)
           .order('created_at', { ascending: false });
 
@@ -322,15 +325,22 @@ export default function AdminOrders() {
     return order.student?.email || '';
   };
 
+  const getCustomerPhone = (order: OrderWithDetails) => {
+    if (order.source === 'guest') return order.phone || '';
+    return order.delivery_phone || order.student?.phone || '';
+  };
+
   const filteredOrders = orders.filter(order => {
     const searchLower = searchQuery.toLowerCase();
     const customerName = getCustomerName(order).toLowerCase();
     const customerEmail = getCustomerEmail(order).toLowerCase();
+    const customerPhone = getCustomerPhone(order).toLowerCase();
     const bundleName = order.bundle?.name.toLowerCase() || '';
 
     return (
       customerName.includes(searchLower) ||
       customerEmail.includes(searchLower) ||
+      customerPhone.includes(searchLower) ||
       bundleName.includes(searchLower) ||
       order.id.toLowerCase().includes(searchLower)
     );
@@ -515,10 +525,37 @@ export default function AdminOrders() {
                       <div className="text-sm">
                         <p className="font-medium text-slate-900">{getCustomerName(order)}</p>
                         <p className="text-slate-500">{getCustomerEmail(order)}</p>
+                        {getCustomerPhone(order) && (
+                          <a href={`tel:${getCustomerPhone(order)}`} className="text-slate-600 hover:text-blue-600 transition-colors flex items-center gap-1 mt-0.5 w-max">
+                            <Phone className="w-3 h-3" />
+                            {getCustomerPhone(order)}
+                          </a>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <p className="text-sm font-medium text-slate-900">{order.bundle?.name || 'Unknown'}</p>
+                      
+                      {order.custom_items && order.custom_items.length > 0 && (
+                        <div className="mt-1.5 flex flex-wrap gap-1">
+                          {(order.custom_items || []).filter((item: string) => !(order.bundle.items || []).includes(item)).map((item: string, idx: number) => (
+                            <span key={`add-${idx}`} className="text-[10px] bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded border border-emerald-200">
+                              <span className="font-bold">+</span> {item}
+                            </span>
+                          ))}
+                          {(order.bundle.items || []).filter((item: string) => !(order.custom_items || []).includes(item)).map((item: string, idx: number) => (
+                            <span key={`rem-${idx}`} className="text-[10px] bg-red-50 text-red-700 px-1.5 py-0.5 rounded border border-red-200 flex items-center">
+                              <span className="mr-0.5 font-bold">-</span> <span className="line-through">{item}</span>
+                            </span>
+                          ))}
+                          {(order.custom_items || []).filter((item: string) => (order.bundle.items || []).includes(item)).map((item: string, idx: number) => (
+                            <span key={`kept-${idx}`} className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded border border-slate-200">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
                       {order.notes?.includes('[SEMESTER SUBSCRIPTION') && (
                         <span className="inline-block mt-1 px-2 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded uppercase tracking-wider">
                           {order.notes.match(/\[SEMESTER SUBSCRIPTION:\s*([^\]]+)\]/) 
