@@ -47,7 +47,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-2">
               <ShoppingBag className="w-8 h-8 text-emerald-400" />
-              <span className="text-xl font-bold text-white">UENR Food Bundles</span>
+              <span className="text-xl font-bold text-white">Food Bundles</span>
             </div>
 
             {/* Desktop nav */}

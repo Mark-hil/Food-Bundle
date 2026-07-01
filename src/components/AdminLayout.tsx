@@ -48,7 +48,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
         {/* Logo */}
         <div className="flex items-center space-x-2 p-6 border-b border-slate-800">
           <ShoppingBag className="w-8 h-8 text-white" />
-          <span className="text-xl font-bold text-white font-display tracking-wide">UENR Food</span>
+          <span className="text-xl font-bold text-white font-display tracking-wide">Food Bundles</span>
         </div>
 
         {/* Navigation Items */}
