@@ -84,35 +84,6 @@ export default function Payment() {
     }
   };
 
-  const simulatePayment = async () => {
-    if (!order) return;
-
-    setProcessing(true);
-    setPaymentStatus('idle');
-
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    try {
-      const { error: rpcError } = await supabase.rpc('simulate_payment_success', {
-        p_order_id: order.id,
-        p_is_guest: false
-      });
-
-      if (rpcError) throw rpcError;
-
-      setPaymentStatus('success');
-
-      setTimeout(() => {
-        navigate('/orders');
-      }, 2000);
-    } catch (error) {
-      console.error('Payment simulation error:', error);
-      setPaymentStatus('error');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -200,26 +171,7 @@ export default function Payment() {
             )}
           </button>
 
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-white/10"></div>
-            </div>
-            <div className="relative flex justify-center text-sm">
-              <span className="px-4 bg-slate-900 text-gray-500">OR</span>
-            </div>
-          </div>
 
-          <button
-            onClick={simulatePayment}
-            disabled={processing || paymentStatus === 'success'}
-            className="w-full bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold py-4 px-6 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Simulate Payment (Demo Mode)
-          </button>
-
-          <p className="text-xs text-gray-500 text-center px-4">
-            Demo mode allows you to test the system without actual payment
-          </p>
         </div>
       </div>
     </div>
