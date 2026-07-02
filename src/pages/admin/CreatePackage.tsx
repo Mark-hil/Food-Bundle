@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
 import { ArrowLeft, Plus } from 'lucide-react';
+import ImageUpload from '../../components/ImageUpload';
 
 export default function CreatePackage() {
   const navigate = useNavigate();
@@ -124,6 +125,14 @@ export default function CreatePackage() {
                 required
                 className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                 placeholder="e.g., Basic Meal Plan"
+              />
+            </div>
+
+            <div>
+              <ImageUpload 
+                value={formData.image_url} 
+                onChange={(url) => setFormData(prev => ({ ...prev, image_url: url }))} 
+                label="Package Image (Required for display)"
               />
             </div>
 

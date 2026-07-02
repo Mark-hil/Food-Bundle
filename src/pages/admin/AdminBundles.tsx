@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Bundle } from '../../lib/supabase';
 import { Plus, Package, CreditCard as Edit2, Trash2, X } from 'lucide-react';
+import ImageUpload from '../../components/ImageUpload';
 
 export default function AdminBundles() {
   const [bundles, setBundles] = useState<Bundle[]>([]);
@@ -290,13 +291,10 @@ export default function AdminBundles() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Image URL</label>
-                <input
-                  type="url"
-                  value={formData.image_url}
-                  onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50"
-                  placeholder="https://example.com/image.jpg"
+                <ImageUpload 
+                  value={formData.image_url} 
+                  onChange={(url) => setFormData({ ...formData, image_url: url })} 
+                  label="Package Image (Required for display)"
                 />
               </div>
 
