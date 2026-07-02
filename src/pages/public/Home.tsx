@@ -3,6 +3,7 @@ import { ArrowRight, Package, Zap, Shield, Clock, CheckCircle } from 'lucide-rea
 import { Link } from '../../lib/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import SEO from '../../components/SEO';
 
 export default function Home() {
   const { user } = useAuth();
@@ -77,6 +78,19 @@ export default function Home() {
 
   return (
     <>
+      <SEO 
+        title="Home | Student Food Bundle System"
+        description="Fresh, nutritious meal bundles crafted for students. Order today and enjoy convenient delivery right to your location."
+        canonical="https://www.food-bundle.com/"
+        schema={{
+          "@context": "https://schema.org",
+          "@type": "Organization",
+          "name": "Student Food Bundle System",
+          "url": "https://www.food-bundle.com/",
+          "logo": "https://www.food-bundle.com/vite.svg",
+          "description": "Fresh, nutritious meal bundles crafted for students."
+        }}
+      />
       <style>{styles}</style>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900">
         {/* Hero Section */}

@@ -1,4 +1,5 @@
 import { Heart, Users, Target, Award } from 'lucide-react';
+import SEO from '../../components/SEO';
 
 export default function About() {
   const styles = `
@@ -33,6 +34,11 @@ export default function About() {
 
   return (
     <>
+      <SEO 
+        title="About Us | Student Food Bundle System"
+        description="Learn more about our mission to provide affordable, nutritious food bundles for students."
+        canonical="https://www.food-bundle.com/about"
+      />
       <style>{styles}</style>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-24">
         <div className="max-w-4xl mx-auto px-4">

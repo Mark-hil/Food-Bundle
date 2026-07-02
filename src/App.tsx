@@ -194,13 +194,17 @@ function AppContent() {
   );
 }
 
+import { HelmetProvider } from 'react-helmet-async';
+
 function App() {
   return (
-    <NavigationProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </NavigationProvider>
+    <HelmetProvider>
+      <NavigationProvider>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </NavigationProvider>
+    </HelmetProvider>
   );
 }
 

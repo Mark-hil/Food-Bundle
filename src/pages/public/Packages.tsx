@@ -3,6 +3,7 @@ import { Check, ArrowRight, Zap, Crown, Rocket, ShoppingCart } from 'lucide-reac
 import { Link, useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import SEO from '../../components/SEO';
 
 export default function Packages() {
   const { user } = useAuth();
@@ -110,6 +111,11 @@ export default function Packages() {
 
   return (
     <>
+      <SEO 
+        title="Our Packages | Student Food Bundle System"
+        description="Choose from our premium food bundles tailored for every budget. Alpha, Beta, and Gamma food bundles."
+        canonical="https://www.food-bundle.com/packages"
+      />
       <style>{styles}</style>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-24">
         <div className="max-w-7xl mx-auto px-4">

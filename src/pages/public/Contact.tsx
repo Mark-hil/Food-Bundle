@@ -1,5 +1,6 @@
 import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 import { useState } from 'react';
+import SEO from '../../components/SEO';
 
 export default function Contact() {
   const styles = `
@@ -56,6 +57,11 @@ export default function Contact() {
 
   return (
     <>
+      <SEO 
+        title="Contact Us | Student Food Bundle System"
+        description="Get in touch with us for support, inquiries, or feedback."
+        canonical="https://www.food-bundle.com/contact"
+      />
       <style>{styles}</style>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-24">
         <div className="max-w-4xl mx-auto px-4">

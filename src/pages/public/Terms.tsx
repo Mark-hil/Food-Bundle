@@ -1,6 +1,14 @@
+import SEO from '../../components/SEO';
+
 export default function Terms() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-20">
+    <>
+      <SEO 
+        title="Terms & Conditions | Student Food Bundle System"
+        description="Read our terms and conditions for using the Student Food Bundle System."
+        canonical="https://www.food-bundle.com/terms"
+      />
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-20">
       <div className="max-w-3xl mx-auto px-4">
         <div className="bg-white rounded-lg shadow-sm p-12">
           <h1 className="text-4xl font-bold text-slate-900 mb-8">Terms & Conditions</h1>
@@ -64,5 +72,6 @@ export default function Terms() {
         </div>
       </div>
     </div>
+    </>
   );
 }

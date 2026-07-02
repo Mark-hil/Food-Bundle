@@ -1,6 +1,14 @@
+import SEO from '../../components/SEO';
+
 export default function Privacy() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-20">
+    <>
+      <SEO 
+        title="Privacy Policy | Student Food Bundle System"
+        description="Read our privacy policy and learn how we protect your data."
+        canonical="https://www.food-bundle.com/privacy"
+      />
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 py-20">
       <div className="max-w-3xl mx-auto px-4">
         <div className="bg-white rounded-lg shadow-sm p-12">
           <h1 className="text-4xl font-bold text-slate-900 mb-8">Privacy Policy</h1>
@@ -101,5 +109,6 @@ export default function Privacy() {
         </div>
       </div>
     </div>
+    </>
   );
 }

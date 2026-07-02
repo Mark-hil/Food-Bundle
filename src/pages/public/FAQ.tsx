@@ -1,5 +1,6 @@
 import { ChevronDown, Mail } from 'lucide-react';
 import { useState } from 'react';
+import SEO from '../../components/SEO';
 
 export default function FAQ() {
   const styles = `
@@ -65,6 +66,11 @@ export default function FAQ() {
 
   return (
     <>
+      <SEO 
+        title="FAQ | Student Food Bundle System"
+        description="Find answers to common questions about our food bundles, delivery, and payment."
+        canonical="https://www.food-bundle.com/faq"
+      />
       <style>{styles}</style>
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-24">
         <div className="max-w-3xl mx-auto px-4">
