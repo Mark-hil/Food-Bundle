@@ -8,7 +8,7 @@ export default function VerifyEmail() {
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash.includes('type=email_change')) {
+    if (hash.includes('type=email_change') || hash.includes('type=signup') || hash.includes('access_token')) {
       setVerified(true);
     } else {
       setError('Invalid verification link');
