@@ -22,3 +22,30 @@ Both "Simulate Payment" and "Pay with Paystack" are fully operational now! Go ah
 How it works: If you actually have people delivering the food to dorms, you create a third user role: 'driver'. The driver has a simplified mobile view where they see their assigned orders and tap "Delivered" when they drop the food at the door.
 
 let set up Admin SMS Alerts (Recommended & Quickest), and this Web Push Notifications: Requires setting up a Progressive Web App (PWA) 
+
+
+
+with this platform how can i know how many pepole visted the site 
+
+
+
+
+To track how many people are visiting your site, you will need to integrate an analytics tool. Since your site is built with React/Vite and hosted on Vercel, you have two excellent, industry-standard options:
+
+1. Vercel Web Analytics (Highly Recommended & Easiest)
+Because you are already hosting on Vercel, this is the easiest to set up. It provides a beautiful dashboard right inside your Vercel account that shows you:
+
+Total visitors and page views
+What countries your visitors are from
+What pages they are visiting the most
+What devices they are using
+To set this up: We just need to install the @vercel/analytics package and add one line of code to your src/App.tsx file. Then, you click "Enable Analytics" in your Vercel dashboard online.
+
+2. Google Analytics (Most Detailed)
+Google Analytics is free and provides the most comprehensive data possible. It is the industry standard but has a slightly more complex dashboard.
+
+Shows you exactly how users find your site (Google search, social media links, direct).
+Tracks user behavior deeply (how long they stay, where they drop off).
+To set this up: You would need to go to analytics.google.com, create a free account, get a "Measurement ID" (which looks like G-XXXXXXXXXX), and then I can add the tracking script into your index.html file.
+
+Would you like me to go ahead and set up Vercel Web Analytics for you? It only takes a minute, and you'll immediately start seeing visitor counts in your Vercel dashboard online.
