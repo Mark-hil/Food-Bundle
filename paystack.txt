@@ -20,3 +20,5 @@ Both "Simulate Payment" and "Pay with Paystack" are fully operational now! Go ah
 
 
 How it works: If you actually have people delivering the food to dorms, you create a third user role: 'driver'. The driver has a simplified mobile view where they see their assigned orders and tap "Delivered" when they drop the food at the door.
+
+let set up Admin SMS Alerts (Recommended & Quickest), and this Web Push Notifications: Requires setting up a Progressive Web App (PWA) 

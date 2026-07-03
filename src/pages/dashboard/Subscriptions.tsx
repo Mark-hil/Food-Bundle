@@ -165,7 +165,7 @@ export default function Subscriptions() {
           <p className="text-gray-400">Manage your regular food bundle subscriptions</p>
         </div>
         <button
-          onClick={() => navigate('/bundles')}
+          onClick={() => navigate('/')}
           className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white rounded-lg font-medium transition transform hover:scale-105"
         >
           <Plus size={20} />
@@ -177,7 +177,7 @@ export default function Subscriptions() {
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl shadow-sm p-12 text-center">
           <p className="text-gray-400 text-lg mb-4">No subscriptions yet</p>
           <button
-            onClick={() => navigate('/bundles')}
+            onClick={() => navigate('/')}
             className="inline-flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-blue-500 to-emerald-500 text-white hover:shadow-lg hover:shadow-blue-500/50 rounded-lg font-medium transition transform hover:scale-105"
           >
             <Plus size={20} />

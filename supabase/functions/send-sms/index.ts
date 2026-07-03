@@ -36,7 +36,9 @@ serve(async (req) => {
     } else if (type === "UPDATE") {
       // Status change
       if (record.status !== old_record?.status) {
-        if (record.status === 'preparing') {
+        if (record.status === 'confirmed') {
+          message = `Your order #${record.id.slice(0, 8)} has been confirmed! We will start preparing it shortly.`;
+        } else if (record.status === 'preparing') {
           message = `Great news! We have started preparing your order #${record.id.slice(0, 8)}.`;
         } else if (record.status === 'ready') {
           message = `Your order #${record.id.slice(0, 8)} is out for delivery! The rider will call this number when they arrive.`;
@@ -55,7 +57,7 @@ serve(async (req) => {
       return new Response("Server configuration error", { status: 500 });
     }
 
-    // Send via Arkesel V2 API
+    // Send via Arkesel V2 API to Customer
     const response = await fetch("https://sms.arkesel.com/api/v2/sms/send", {
       method: "POST",
       headers: {
@@ -70,13 +72,52 @@ serve(async (req) => {
     });
 
     const result = await response.json();
-    console.log("Arkesel response:", result);
+    console.log("Arkesel response (Customer):", result);
 
     if (!response.ok) {
-      throw new Error(`Arkesel API error: ${JSON.stringify(result)}`);
+      throw new Error(`Arkesel API error (Customer): ${JSON.stringify(result)}`);
     }
 
-    return new Response(JSON.stringify({ success: true, message: "SMS sent successfully" }), {
+    // --- ADMIN NOTIFICATION SECTION ---
+    if (type === "INSERT") {
+      const ADMIN_PHONE = Deno.env.get("ADMIN_PHONE");
+      if (ADMIN_PHONE) {
+        // Format Admin Phone
+        let formattedAdminPhone = ADMIN_PHONE.replace(/[^0-9+]/g, '');
+        if (formattedAdminPhone.startsWith('0')) {
+          formattedAdminPhone = '233' + formattedAdminPhone.slice(1);
+        } else if (formattedAdminPhone.startsWith('+')) {
+          formattedAdminPhone = formattedAdminPhone.slice(1);
+        }
+
+        const adminMessage = `🚨 New FoodBundle Order #${record.id.slice(0, 8)}! Please check the admin dashboard.`;
+        
+        try {
+          const adminResponse = await fetch("https://sms.arkesel.com/api/v2/sms/send", {
+            method: "POST",
+            headers: {
+              "api-key": ARKESEL_API_KEY,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              sender: SENDER_ID,
+              message: adminMessage,
+              recipients: [formattedAdminPhone],
+            }),
+          });
+          const adminResult = await adminResponse.json();
+          console.log("Arkesel response (Admin):", adminResult);
+        } catch (adminError) {
+          console.error("Failed to send admin SMS:", adminError);
+          // Don't throw error to avoid failing the customer notification if admin notification fails.
+        }
+      } else {
+         console.log("ADMIN_PHONE environment variable is not set. Admin SMS skipped.");
+      }
+    }
+    // ----------------------------------
+
+    return new Response(JSON.stringify({ success: true, message: "SMS processing complete" }), {
       headers: { "Content-Type": "application/json" },
       status: 200,
     });

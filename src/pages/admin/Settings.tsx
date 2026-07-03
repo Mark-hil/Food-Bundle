@@ -23,9 +23,87 @@ export default function Settings() {
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pushStatus, setPushStatus] = useState<'idle' | 'loading' | 'subscribed' | 'error'>('idle');
+
+  // Utility to convert VAPID key to Uint8Array
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, '+')
+      .replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const enablePushNotifications = async () => {
+    try {
+      setPushStatus('loading');
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        throw new Error('Push notifications are not supported by your browser.');
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        throw new Error('Notification permission denied.');
+      }
+
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      await navigator.serviceWorker.ready;
+
+      let subscription = await registration.pushManager.getSubscription();
+      
+      const publicVapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+      if (!publicVapidKey) {
+         throw new Error('VAPID Public Key is missing.');
+      }
+
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicVapidKey)
+        });
+      }
+
+      // Save to Supabase
+      const { error: dbError } = await supabase
+        .from('admin_push_subscriptions')
+        .insert([{ subscription: subscription.toJSON() }]);
+
+      if (dbError) throw dbError;
+
+      setPushStatus('subscribed');
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      console.error('Error enabling push notifications:', err);
+      setError(err.message || 'Failed to enable notifications');
+      setPushStatus('error');
+    }
+  };
+
+  const checkPushSubscription = async () => {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration) {
+          const subscription = await registration.pushManager.getSubscription();
+          if (subscription) {
+            setPushStatus('subscribed');
+          }
+        }
+      } catch (err) {
+        console.error("Error checking push subscription:", err);
+      }
+    }
+  };
 
   useEffect(() => {
     fetchSettings();
+    checkPushSubscription();
   }, []);
 
   const fetchSettings = async () => {
@@ -358,6 +436,34 @@ export default function Settings() {
                     className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                   />
                   <p className="text-xs text-slate-500 mt-1">Minimum points balance required to claim a discount.</p>
+                </div>
+              </div>
+            </div>
+            <div className="pt-2">
+              <div className="flex items-center mb-6">
+                <svg className="w-5 h-5 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                <h2 className="text-lg font-semibold text-slate-900">Admin Notifications</h2>
+              </div>
+              <div className="border-t border-slate-200 pt-6">
+                <div className="flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <div>
+                    <h3 className="font-medium text-slate-900">Desktop Push Notifications</h3>
+                    <p className="text-sm text-slate-600 mt-1">Get instant alerts when a new order is placed, even when the dashboard is closed.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={enablePushNotifications}
+                    disabled={pushStatus === 'subscribed' || pushStatus === 'loading'}
+                    className={`px-4 py-2 rounded-lg font-medium transition ${
+                      pushStatus === 'subscribed' ? 'bg-green-100 text-green-700' : 
+                      'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {pushStatus === 'loading' ? 'Setting up...' : 
+                     pushStatus === 'subscribed' ? 'Enabled ✓' : 'Enable Notifications'}
+                  </button>
                 </div>
               </div>
             </div>

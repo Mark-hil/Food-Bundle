@@ -332,6 +332,7 @@ export default function AdminOrders() {
 
   const filteredOrders = orders.filter(order => {
     const searchLower = searchQuery.toLowerCase();
+    const searchId = searchLower.replace(/^#/, '');
     const customerName = getCustomerName(order).toLowerCase();
     const customerEmail = getCustomerEmail(order).toLowerCase();
     const customerPhone = getCustomerPhone(order).toLowerCase();
@@ -342,7 +343,7 @@ export default function AdminOrders() {
       customerEmail.includes(searchLower) ||
       customerPhone.includes(searchLower) ||
       bundleName.includes(searchLower) ||
-      order.id.toLowerCase().includes(searchLower)
+      order.id.toLowerCase().includes(searchId)
     );
   });
 
@@ -523,6 +524,9 @@ export default function AdminOrders() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm">
+                        <p className="font-mono text-[11px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">
+                          #{order.id.slice(0, 8)}
+                        </p>
                         <p className="font-medium text-slate-900">{getCustomerName(order)}</p>
                         <p className="text-slate-500">{getCustomerEmail(order)}</p>
                         {getCustomerPhone(order) && (
