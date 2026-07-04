@@ -1,11 +1,16 @@
+import { precacheAndRoute } from 'workbox-precaching';
+
+// Use the precache manifest injected by vite-plugin-pwa
+precacheAndRoute(self.__WB_MANIFEST || []);
+
 self.addEventListener('push', function (event) {
   if (event.data) {
     const data = event.data.json();
     const title = data.title || 'New Notification';
     const options = {
       body: data.body || 'You have a new message.',
-      icon: '/icon-192x192.png',
-      badge: '/icon-192x192.png',
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
       vibrate: [100, 50, 100],
       data: {
         url: data.url || '/',

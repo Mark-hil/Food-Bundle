@@ -195,6 +195,7 @@ function AppContent() {
 }
 
 import { HelmetProvider } from 'react-helmet-async';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
 
 function App() {
   return (
@@ -202,6 +203,7 @@ function App() {
       <NavigationProvider>
         <AuthProvider>
           <AppContent />
+          <PWAInstallPrompt />
         </AuthProvider>
       </NavigationProvider>
     </HelmetProvider>
