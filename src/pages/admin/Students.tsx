@@ -32,7 +32,7 @@ export default function Students() {
           const { count, error: countError } = await supabase
             .from('orders')
             .select('id', { count: 'exact', head: true })
-            .eq('user_id', student.id);
+            .eq('student_id', student.id);
           if (!countError) {
             counts[student.id] = count || 0;
           }

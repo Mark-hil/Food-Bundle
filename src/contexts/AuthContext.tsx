@@ -10,6 +10,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null; role?: string }>;
   signOut: () => Promise<void>;
   isAdmin: boolean;
+  isDriver: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -111,9 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const isAdmin = profile?.role === 'admin';
+  const isDriver = profile?.role === 'driver';
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, isAdmin }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, isAdmin, isDriver }}>
       {children}
     </AuthContext.Provider>
   );

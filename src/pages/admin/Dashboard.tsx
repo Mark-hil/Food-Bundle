@@ -108,7 +108,7 @@ export default function AdminDashboard() {
           .select(
             `id, total_amount, status, created_at, delivery_date, notes,
              bundles(name),
-             profiles(full_name)`,
+             profiles!orders_student_id_fkey(full_name)`,
             { head: false }
           )
           .order('created_at', { ascending: false })

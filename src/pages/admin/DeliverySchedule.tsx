@@ -16,7 +16,7 @@ export default function DeliverySchedule() {
     try {
       const { data, error: queryError } = await supabase
         .from('orders')
-        .select('id, student_id, delivery_address, status, created_at, profiles(full_name, email, phone)')
+        .select('id, student_id, delivery_address, status, created_at, profiles!orders_student_id_fkey(full_name, email, phone)')
         .gte('created_at', `${selectedDate}T00:00:00`)
         .lt('created_at', `${selectedDate}T23:59:59`)
         .order('created_at', { ascending: true });

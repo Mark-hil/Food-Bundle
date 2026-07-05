@@ -97,7 +97,7 @@ export default function AdminOrders() {
           .select(`
             *,
             bundle:bundles(name, items),
-            profiles(full_name, email, phone, student_id)
+            profiles!orders_student_id_fkey(full_name, email, phone, student_id)
           `)
           .order('created_at', { ascending: false });
 
@@ -291,6 +291,8 @@ export default function AdminOrders() {
         return 'bg-purple-100 text-purple-800';
       case 'ready':
         return 'bg-teal-100 text-teal-800';
+      case 'out_for_delivery':
+        return 'bg-orange-100 text-orange-800';
       default:
         return 'bg-slate-100 text-slate-800';
     }
@@ -310,6 +312,8 @@ export default function AdminOrders() {
         return 'bg-purple-600 text-white';
       case 'ready':
         return 'bg-teal-600 text-white';
+      case 'out_for_delivery':
+        return 'bg-orange-500 text-white';
       default:
         return 'bg-slate-600 text-white';
     }
@@ -612,6 +616,7 @@ export default function AdminOrders() {
                         <option value="confirmed" className="bg-white text-slate-900">Confirmed</option>
                         <option value="preparing" className="bg-white text-slate-900">Preparing</option>
                         <option value="ready" className="bg-white text-slate-900">Ready</option>
+                        <option value="out_for_delivery" className="bg-white text-slate-900">Out for Delivery</option>
                         <option value="delivered" className="bg-white text-slate-900">Delivered</option>
                         <option value="cancelled" className="bg-white text-slate-900">Cancelled</option>
                       </select>

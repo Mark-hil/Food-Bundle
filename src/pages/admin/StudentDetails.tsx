@@ -35,7 +35,7 @@ export default function StudentDetails() {
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
         .select('*')
-        .eq('user_id', studentId)
+        .eq('student_id', studentId)
         .order('created_at', { ascending: false });
 
       if (ordersError) throw ordersError;
@@ -117,12 +117,42 @@ export default function StudentDetails() {
               {(student?.full_name || 'S')[0].toUpperCase()}
             </div>
 
-            {/* Profile Info */}
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold text-slate-900 mb-2">{student?.full_name || 'Student'}</h1>
-              <span className="inline-block px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-700">
-                Student
-              </span>
+            <div className="flex-1 flex justify-between items-start">
+              <div>
+                <h1 className="text-3xl font-bold text-slate-900 mb-2">{student?.full_name || 'Student'}</h1>
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${
+                  student?.role === 'admin' ? 'bg-purple-100 text-purple-700' :
+                  student?.role === 'driver' ? 'bg-orange-100 text-orange-700' :
+                  'bg-blue-100 text-blue-700'
+                }`}>
+                  {student?.role?.charAt(0).toUpperCase() + student?.role?.slice(1) || 'Student'}
+                </span>
+              </div>
+              
+              {/* Role Management */}
+              {student?.role !== 'admin' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={async () => {
+                      try {
+                        const newRole = student?.role === 'driver' ? 'student' : 'driver';
+                        const { error: updateError } = await supabase.from('profiles').update({ role: newRole }).eq('id', student?.id);
+                        if (updateError) throw updateError;
+                        fetchStudentData();
+                      } catch (err: any) {
+                        setError(err.message || 'Failed to update role');
+                      }
+                    }}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition border ${
+                      student?.role === 'driver' 
+                        ? 'border-red-200 text-red-600 hover:bg-red-50'
+                        : 'border-blue-200 text-blue-600 hover:bg-blue-50'
+                    }`}
+                  >
+                    {student?.role === 'driver' ? 'Revoke Driver Access' : 'Promote to Driver'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

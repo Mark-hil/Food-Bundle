@@ -41,7 +41,9 @@ serve(async (req) => {
         } else if (record.status === 'preparing') {
           message = `Great news! We have started preparing your order #${record.id.slice(0, 8)}.`;
         } else if (record.status === 'ready') {
-          message = `Your order #${record.id.slice(0, 8)} is out for delivery! The rider will call this number when they arrive.`;
+          message = `Your order #${record.id.slice(0, 8)} is packaged and waiting for a driver to pick it up!`;
+        } else if (record.status === 'out_for_delivery') {
+          message = `Your order #${record.id.slice(0, 8)} is OUT FOR DELIVERY! The driver is on their way. Please have your 4-digit Pickup PIN ready: ${record.pickup_pin}`;
         } else if (record.status === 'delivered') {
           message = `Your order #${record.id.slice(0, 8)} has been delivered. Enjoy your meal!`;
         }

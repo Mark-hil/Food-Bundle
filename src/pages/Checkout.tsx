@@ -290,121 +290,30 @@ export default function Checkout() {
       const totalDiscount = promoDiscount + pointsDiscount + subscriptionDiscount;
       const totalAmount = Math.max(0, subtotal + finalDeliveryCost - totalDiscount);
 
-      let subscriptionId: string | undefined;
-
-      if (isSubscription) {
-        const { data: subData, error: subError } = await supabase
-          .from('subscriptions')
-          .insert({
-            student_id: user.id,
-            bundle_id: bundle.id,
-            frequency: 'monthly',
-            quantity,
-            delivery_address: deliveryAddress,
-            delivery_time: deliveryTime || null,
-            status: 'active',
-            next_delivery_date: deliveryDate || new Date().toISOString().split('T')[0],
-            duration_months: 3,
-            deliveries_made: 0,
-            custom_items: customItems.length > 0 ? customItems : null
-          })
-          .select()
-          .single();
-        if (subError) throw subError;
-        subscriptionId = subData.id;
-      }
-
-      const { data: orderData, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          student_id: user.id,
-          bundle_id: bundle.id,
-          subscription_id: subscriptionId,
-          quantity,
-          total_amount: totalAmount,
-          delivery_fee: finalDeliveryCost,
-          delivery_address: deliveryAddress,
-          delivery_date: deliveryDate || null,
-          delivery_time: deliveryTime || null,
-          notes: isSubscription ? `[SEMESTER SUBSCRIPTION: Delivery 1 of 3] ${notes}`.trim() : (notes || null),
-          status: 'pending',
-          pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(),
-          custom_items: customItems.length > 0 ? customItems : null,
-          delivery_phone: deliveryPhone || null
-        })
-        .select()
-        .single();
-
-      if (orderError) throw orderError;
-
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          order_id: orderData.id,
-          student_id: user.id,
-          amount: totalAmount,
-          status: 'pending',
-        });
-
-      if (transactionError) throw transactionError;
-
-      // Award loyalty points
       const pointsEarned = Math.floor(totalAmount / loyaltyEarnStepAmount) * loyaltyEarnStepPoints;
-      if (pointsEarned > 0) {
-        try {
-          // Get current balance
-          const { data: lastRecord } = await supabase
-            .from('loyalty_points')
-            .select('balance')
-            .eq('student_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
 
-          const currentBalance = lastRecord?.balance || 0;
-          const newBalance = currentBalance + pointsEarned;
+      const { data: orderId, error: rpcError } = await supabase.rpc('place_order', {
+        p_student_id: user.id,
+        p_bundle_id: bundle.id,
+        p_quantity: quantity,
+        p_is_subscription: isSubscription,
+        p_delivery_address: deliveryAddress,
+        p_delivery_time: deliveryTime || null,
+        p_delivery_date: deliveryDate || null,
+        p_notes: isSubscription ? `[SEMESTER SUBSCRIPTION: Delivery 1 of 3] ${notes}`.trim() : (notes || null),
+        p_pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(),
+        p_custom_items: customItems.length > 0 ? customItems : null,
+        p_delivery_phone: deliveryPhone || null,
+        p_total_amount: totalAmount,
+        p_delivery_fee: finalDeliveryCost,
+        p_use_points: usePoints,
+        p_points_to_use: pointsToUse,
+        p_points_earned: pointsEarned
+      });
 
-          await supabase.from('loyalty_points').insert({
-            student_id: user.id,
-            points: pointsEarned,
-            balance: newBalance,
-            type: 'earned',
-            reference: `Order ${orderData.id.slice(0, 8)}`,
-          });
-        } catch (pointsError) {
-          console.error('Error awarding loyalty points:', pointsError);
-          // Don't fail the order if points fail
-        }
-      }
+      if (rpcError) throw rpcError;
 
-      // Deduct loyalty points if used
-      if (usePoints && pointsToUse > 0) {
-        try {
-          const { data: lastRecord } = await supabase
-            .from('loyalty_points')
-            .select('balance')
-            .eq('student_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          const currentBalance = lastRecord?.balance || 0;
-          const newBalance = currentBalance - pointsToUse;
-
-          await supabase.from('loyalty_points').insert({
-            student_id: user.id,
-            points: -pointsToUse,
-            balance: newBalance,
-            type: 'redeemed',
-            reference: `Order ${orderData.id.slice(0, 8)}`,
-          });
-        } catch (deductError) {
-          console.error('Error deducting loyalty points:', deductError);
-          // Don't fail the order if points deduction fails
-        }
-      }
-
-      navigate(`/payment?order=${orderData.id}`);
+      navigate(`/payment?order=${orderId}`);
     } catch (error) {
       console.error('Error creating order:', error);
       setError('Failed to create order. Please try again.');

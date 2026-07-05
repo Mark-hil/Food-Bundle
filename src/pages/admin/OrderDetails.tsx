@@ -23,7 +23,7 @@ export default function AdminOrderDetails() {
     try {
       const { data, error: queryError } = await supabase
         .from('orders')
-        .select('*, bundle:bundle_id(name, items), student:profiles(full_name, email, phone)')
+        .select('*, bundle:bundle_id(name, items), student:profiles!orders_student_id_fkey(full_name, email, phone)')
         .eq('id', orderId)
         .maybeSingle();
 

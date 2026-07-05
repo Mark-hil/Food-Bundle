@@ -1,5 +1,6 @@
+import { useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { NavigationProvider, useLocation } from './lib/navigation';
+import { NavigationProvider, useLocation, useNavigate } from './lib/navigation';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 import PublicNavbar from './components/PublicNavbar';
@@ -58,9 +59,10 @@ import Referrals from './pages/dashboard/Referrals';
 import WhatsAppButton from './components/WhatsAppButton';
 import PageTransition from './components/PageTransition';
 import PromoCodes from './pages/admin/PromoCodes';
+import DriverDashboard from './pages/driver/Dashboard';
 
 function AppContent() {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, isDriver } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -139,6 +141,22 @@ function AppContent() {
 
   // Determine if current route is an admin route
   const isAdminRoute = location.pathname.startsWith('/admin');
+  
+  // Handle driver routing
+  if (isDriver) {
+    if (location.pathname !== '/driver/dashboard') {
+      // Small wrapper component to handle redirect safely
+      const DriverRedirect = () => {
+        const navigate = useNavigate();
+        useEffect(() => {
+          navigate('/driver/dashboard');
+        }, []);
+        return <DriverDashboard />;
+      };
+      return <DriverRedirect />;
+    }
+    return <DriverDashboard />;
+  }
 
   // Render admin routes with AdminLayout
   if (isAdmin && isAdminRoute) {

@@ -40,6 +40,8 @@ export default function Login() {
     } else {
       if (role === 'admin') {
         navigate('/admin/dashboard');
+      } else if (role === 'driver') {
+        navigate('/driver/dashboard');
       } else {
         navigate('/dashboard');
       }

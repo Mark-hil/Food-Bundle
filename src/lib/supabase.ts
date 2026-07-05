@@ -15,7 +15,7 @@ export type Profile = {
   full_name: string;
   phone?: string;
   student_id?: string;
-  role: 'student' | 'admin';
+  role: 'student' | 'admin' | 'driver';
   created_at: string;
   updated_at: string;
 };
@@ -49,7 +49,7 @@ export type Order = {
   quantity: number;
   total_amount: number;
   delivery_fee: number;
-  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled';
+  status: 'pending' | 'confirmed' | 'preparing' | 'ready' | 'out_for_delivery' | 'delivered' | 'cancelled';
   delivery_address: string;
   delivery_date?: string;
   delivery_time?: string;

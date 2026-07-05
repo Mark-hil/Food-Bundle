@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useLocation, useNavigate } from '../lib/navigation';
-import { ShoppingBag, Package, User, LogOut, LayoutDashboard, UtensilsCrossed, Gift, Trophy, RefreshCw, Tag, Menu, X } from 'lucide-react';
+import { ShoppingBag, Package, User, LogOut, LayoutDashboard, UtensilsCrossed, RefreshCw, Tag, Menu, X } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import PageTransition from './PageTransition';
 
