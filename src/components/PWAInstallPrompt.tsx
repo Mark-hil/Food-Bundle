@@ -21,8 +21,8 @@ export default function PWAInstallPrompt() {
       // Stash the event so it can be triggered later.
       setDeferredPrompt(e as BeforeInstallPromptEvent);
       
-      // Check if user has previously dismissed it
-      const hasDismissed = localStorage.getItem('pwa-prompt-dismissed');
+      // Check if user has previously dismissed it in this session
+      const hasDismissed = sessionStorage.getItem('pwa-prompt-dismissed');
       if (!hasDismissed) {
         setIsVisible(true);
       }
@@ -54,7 +54,7 @@ export default function PWAInstallPrompt() {
 
   const handleDismiss = () => {
     setIsVisible(false);
-    localStorage.setItem('pwa-prompt-dismissed', 'true');
+    sessionStorage.setItem('pwa-prompt-dismissed', 'true');
   };
 
   if (!isVisible) return null;

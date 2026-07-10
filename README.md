@@ -24,6 +24,14 @@ Food Bundle is a comprehensive, modern web application designed to provide stude
 ### For Drivers
 - **Driver Dashboard:** A mobile-optimized interface to claim, manage, and complete assigned deliveries efficiently.
 
+## 🏗 Architecture
+
+Food Bundle is built on a modern **Serverless (Backend-as-a-Service)** architecture, eliminating the need for a traditional continuous backend server (like Node.js or Django).
+
+- **Frontend:** A smart React application that handles UI, routing, and direct secure communication with the database.
+- **Database & Security:** Supabase PostgreSQL acts as both the data layer and the security layer. Using **Row Level Security (RLS)**, the database itself verifies user sessions (Supabase Auth) and enforces data access rules (e.g., preventing students from seeing admin data).
+- **Backend Logic:** For tasks that cannot be done securely on the frontend (like processing Paystack webhooks or sending Resend emails), the system uses **Supabase Edge Functions**. These serverless functions spin up instantly, execute the required backend code securely, and shut down, ensuring infinite scalability and low costs.
+
 ## 🛠 Tech Stack
 
 - **Frontend Framework:** React 18 with TypeScript
@@ -132,3 +140,19 @@ This project is configured as a PWA, allowing users to install it on their home 
 ## 🤝 Contributing
 
 When contributing to this project, please ensure you follow the existing code style, utilize Tailwind CSS for styling, and ensure any new interactive elements are fully responsive.
+
+
+1. The Frontend (React/Vite)
+Your React application acts as the face of the platform. Because of modern tools, your frontend is smart enough to talk directly and securely to your database without needing a traditional middleman server.
+
+2. The Database & Security (Supabase PostgreSQL)
+Supabase provides your database, but it also acts as a security guard. Instead of a backend server verifying permissions, you use Row Level Security (RLS). This means the database itself knows who is logged in (via Supabase Auth) and automatically blocks students from seeing admin data, or drivers from seeing other drivers' orders.
+
+3. The Backend (Supabase Edge Functions)
+You don't have a traditional server running 24/7, but you do have backend code! This is what your supabase/functions/ directory is. These are called Edge Functions. Whenever your app needs to do something that cannot be done securely on the frontend (like processing a Paystack Webhook, sending an email via Resend, or sending an SMS), an Edge Function spins up instantly on Supabase's servers, runs your backend code, and shuts down.
+
+Why is this better?
+Cost: You aren't paying for a backend server to sit idle at 3:00 AM when no one is ordering food. You only pay for the exact milliseconds your Edge Functions run.
+Speed: Supabase deploys your Edge Functions globally, so they run incredibly fast.
+Maintenance: You don't have to worry about a backend server crashing or needing software updates.
+So, while it might feel like just a "frontend with a DB", Supabase is actually doing all the heavy lifting of a powerful backend behind the scenes!
