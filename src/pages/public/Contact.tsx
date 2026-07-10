@@ -143,7 +143,7 @@ export default function Contact() {
               <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl p-6 animate-in" style={{ animationDelay: '0.5s' }}>
                 <h3 className="font-semibold text-white mb-4">Business Hours</h3>
                 <p className="text-gray-300 mb-2">Monday - Friday: 7am - 9pm</p>
-                <p className="text-gray-300">Saturday - Sunday: 10am - 8pm</p>
+                <p className="text-gray-300">Sunday: 10am - 8pm</p>
               </div>
             </div>
 
