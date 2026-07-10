@@ -22,3 +22,5 @@ dist-ssr
 *.sw?
 .env
 food@bundle1
+paystack.txt 
+how-to-set-resend.txt
