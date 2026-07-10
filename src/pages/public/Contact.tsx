@@ -1,6 +1,7 @@
 import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 import { useState } from 'react';
 import SEO from '../../components/SEO';
+import { supabase } from '../../lib/supabase';
 
 export default function Contact() {
   const styles = `
@@ -34,25 +35,59 @@ export default function Contact() {
 
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
-    setTimeout(() => {
-      setFormData({ name: '', email: '', message: '' });
-      setSubmitted(false);
-    }, 3000);
+    setIsSubmitting(true);
+    setError('');
+
+    try {
+      // 1. Save to database
+      const { error: dbError } = await supabase
+        .from('contact_messages')
+        .insert([{
+          name: formData.name,
+          email: formData.email,
+          message: formData.message
+        }]);
+
+      if (dbError) throw dbError;
+
+      // 2. Invoke email edge function
+      const { error: fnError } = await supabase.functions.invoke('send-contact-email', {
+        body: formData
+      });
+
+      if (fnError) {
+        console.error('Edge function error (email may not have sent):', fnError);
+        // We don't necessarily want to fail the whole submission if just the email fails,
+        // since it's saved in the DB, but we log it.
+      }
+
+      setSubmitted(true);
+      setTimeout(() => {
+        setFormData({ name: '', email: '', message: '' });
+        setSubmitted(false);
+      }, 5000);
+    } catch (err: any) {
+      console.error('Error submitting contact form:', err);
+      setError('Failed to send message. Please try again later.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const contactInfo = [
-    { icon: Phone, title: 'Phone', detail: '+233 XXX XXX XXXX' },
-    { icon: Mail, title: 'Email', detail: 'support@studentmeals.com' },
-    { icon: MapPin, title: 'Address', detail: '123 Campus Lane, Accra, Ghana' }
+    { icon: Phone, title: 'Phone', detail: '+233 241 626 072' },
+    { icon: Mail, title: 'Email', detail: 'support@food-bundle.com' },
+    { icon: MapPin, title: 'Address', detail: 'Across Ghana, University Campus' }
   ];
 
   return (
@@ -112,6 +147,11 @@ export default function Contact() {
                 </div>
               ) : (
                 <form onSubmit={handleSubmit}>
+                  {error && (
+                    <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
+                      {error}
+                    </div>
+                  )}
                   <div className="mb-4">
                     <label className="block text-white font-semibold mb-2">Name</label>
                     <input
@@ -151,8 +191,13 @@ export default function Contact() {
                     />
                   </div>
 
-                  <button type="submit" className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-semibold py-3 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition flex items-center justify-center gap-2 transform hover:scale-105">
-                    <Send size={20} /> Send Message
+                  <button 
+                    type="submit" 
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-semibold py-3 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 transition flex items-center justify-center gap-2 transform hover:scale-105 disabled:opacity-70 disabled:cursor-not-allowed disabled:transform-none"
+                  >
+                    <Send size={20} className={isSubmitting ? 'animate-pulse' : ''} /> 
+                    {isSubmitting ? 'Sending...' : 'Send Message'}
                   </button>
                 </form>
               )}

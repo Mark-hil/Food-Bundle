@@ -101,9 +101,9 @@ export default function Privacy() {
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mb-4">11. Contact Us</h2>
               <p>For privacy-related questions or to exercise your rights:</p>
-              <p className="mt-4">Email: privacy@studentmeals.com</p>
-              <p>Phone: +233 XXX XXX XXXX</p>
-              <p>Address: 123 Campus Lane, Accra, Ghana</p>
+              <p className="mt-4">Email: privacy@food-bundle.com</p>
+              <p>Phone: +233 241 626 072</p>
+              <p>Address: Across Ghana, University Campus</p>
             </section>
           </div>
         </div>

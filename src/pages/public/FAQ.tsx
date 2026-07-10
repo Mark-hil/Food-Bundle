@@ -112,7 +112,7 @@ export default function FAQ() {
           <div className="mt-16 bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl p-12 text-center animate-in" style={{ animationDelay: '0.5s' }}>
             <h2 className="text-3xl font-bold text-white mb-4">Still have questions?</h2>
             <p className="text-gray-300 mb-8">Our support team is here to help. Contact us anytime.</p>
-            <a href="mailto:support@studentmeals.com" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition transform hover:scale-105">
+            <a href="mailto:support@food-bundle.com" className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-8 py-3 rounded-xl font-semibold hover:shadow-lg hover:shadow-blue-500/50 transition transform hover:scale-105">
               <Mail size={20} />
               Contact Support
             </a>

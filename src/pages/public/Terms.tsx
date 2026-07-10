@@ -65,8 +65,9 @@ export default function Terms() {
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mb-4">9. Contact Information</h2>
               <p>If you have any questions about these Terms and Conditions, please contact us at:</p>
-              <p className="mt-4">Email: legal@studentmeals.com</p>
-              <p>Phone: +233 XXX XXX XXXX</p>
+              <p className="mt-4">Email: legal@food-bundle.com</p>
+              <p>Phone: +233 241 626 072</p>
+              <p>Address: Across Ghana, University Campus</p>
             </section>
           </div>
         </div>

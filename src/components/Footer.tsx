@@ -68,21 +68,21 @@ export default function Footer() {
             <div className="space-y-3 text-sm">
               <div className="flex items-start gap-2">
                 <Mail className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                <a href="mailto:support@foodbundle.com" className="text-slate-400 hover:text-white transition">
-                  support@foodbundle.com
+                <a href="mailto:support@food-bundle.com" className="text-slate-400 hover:text-white transition">
+                  support@food-bundle.com
                 </a>
               </div>
               <div className="flex items-start gap-2">
                 <Phone className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                <a href="tel:+1234567890" className="text-slate-400 hover:text-white transition">
-                  +1 (234) 567-8900
+                <a href="tel:+233241626072" className="text-slate-400 hover:text-white transition">
+                  +233 241 626 072
                 </a>
               </div>
               <div className="flex items-start gap-2">
                 <MapPin className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
                 <span className="text-slate-400">
-                  123 Campus Street<br />
-                  City, State 12345
+                  Across Ghana<br />
+                  University Campus
                 </span>
               </div>
             </div>

@@ -94,7 +94,7 @@ export default function RefundPolicy() {
               <h2 className="text-2xl font-bold text-slate-900 mb-4">9. Dispute Resolution</h2>
               <p>If you disagree with a refund decision:</p>
               <ul className="list-disc list-inside mt-4 space-y-2">
-                <li>Contact our support manager at support@studentmeals.com</li>
+                <li>Contact our support manager at support@food-bundle.com</li>
                 <li>Provide comprehensive documentation of your claim</li>
                 <li>We will investigate and respond within 48 hours</li>
               </ul>
@@ -103,8 +103,8 @@ export default function RefundPolicy() {
             <section>
               <h2 className="text-2xl font-bold text-slate-900 mb-4">10. Contact Us</h2>
               <p>For refund-related inquiries:</p>
-              <p className="mt-4">Email: refunds@studentmeals.com</p>
-              <p>Phone: +233 XXX XXX XXXX</p>
+              <p className="mt-4">Email: refunds@food-bundle.com</p>
+              <p>Phone: +233 241 626 072</p>
               <p>Available: Monday - Friday, 8am - 6pm</p>
             </section>
           </div>
