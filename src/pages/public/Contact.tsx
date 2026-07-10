@@ -1,7 +1,8 @@
 import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SEO from '../../components/SEO';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Contact() {
   const styles = `
@@ -33,7 +34,18 @@ export default function Contact() {
     }
   `;
 
+  const { user, profile } = useAuth();
   const [formData, setFormData] = useState({ name: '', email: '', message: '' });
+
+  // Update form data when profile/user loads
+  useEffect(() => {
+    setFormData(prev => ({
+      ...prev,
+      name: profile?.full_name || prev.name,
+      email: user?.email || prev.email
+    }));
+  }, [user, profile]);
+
   const [submitted, setSubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');

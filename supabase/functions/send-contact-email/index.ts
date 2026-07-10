@@ -35,6 +35,7 @@ serve(async (req) => {
       body: JSON.stringify({
         from: 'Food Bundle <noreply@food-bundle.com>',
         to: ['support@food-bundle.com'],
+        reply_to: email,
         subject: `New Contact Message from ${name}`,
         html: `
           <h2>New Contact Form Submission</h2>

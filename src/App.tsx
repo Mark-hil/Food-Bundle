@@ -202,6 +202,7 @@ function AppContent() {
       {location.pathname === '/profile/update-phone' && <UpdatePhone />}
       {location.pathname === '/profile/addresses' && <ManageAddresses />}
       {location.pathname === '/profile/notifications' && <NotificationSettings />}
+      {location.pathname === '/contact' && <Contact />}
       {location.pathname === '/help' && <HelpCenter />}
       {location.pathname === '/support' && <SupportTickets />}
       {location.pathname === '/support/new' && <CreateTicket />}
