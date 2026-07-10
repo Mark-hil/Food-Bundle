@@ -1,7 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link, useLocation, useNavigate } from '../lib/navigation';
-import { ShoppingBag, Package, User, LogOut, LayoutDashboard, UtensilsCrossed, RefreshCw, Tag, Menu, X } from 'lucide-react';
+import { ShoppingBag, Package, User, LogOut, LayoutDashboard, UtensilsCrossed, RefreshCw, Tag, Menu, X, Mail } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import PageTransition from './PageTransition';
 
@@ -26,6 +26,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', label: 'Bundles', icon: UtensilsCrossed },
     { path: '/orders', label: 'My Orders', icon: Package },
     { path: '/subscriptions', label: 'Subscriptions', icon: RefreshCw },
+    { path: '/contact', label: 'Contact', icon: Mail },
     // { path: '/loyalty', label: 'Points', icon: Trophy },
     // { path: '/referrals', label: 'Referrals', icon: Gift },
     { path: '/profile', label: 'Profile', icon: User },
