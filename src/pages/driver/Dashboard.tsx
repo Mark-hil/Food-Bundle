@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Package, Truck, MapPin, Phone, Clock, CheckCircle2, LogOut } from 'lucide-react';
 
 export default function DriverDashboard() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState<'available' | 'mine'>('available');
   const [availableOrders, setAvailableOrders] = useState<any[]>([]);
   const [myOrders, setMyOrders] = useState<any[]>([]);
@@ -298,7 +298,7 @@ export default function DriverDashboard() {
             </div>
             <div>
               <h1 className="text-xl font-bold text-white leading-tight">Driver Hub</h1>
-              <p className="text-xs text-slate-400 font-medium">{user?.user_metadata?.full_name}</p>
+              <p className="text-xs text-slate-400 font-medium">{profile?.full_name || user?.user_metadata?.full_name}</p>
             </div>
           </div>
           <button

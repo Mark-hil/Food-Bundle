@@ -13,7 +13,7 @@ interface RecentOrder {
 }
 
 export default function Overview() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalOrders: 0,
@@ -101,7 +101,7 @@ export default function Overview() {
       {/* Header section */}
       <div>
         <h1 className="text-3xl sm:text-4xl font-display font-bold text-white tracking-tight">
-          Welcome back, {user?.user_metadata?.full_name?.split(' ')[0] || 'Student'}! 👋
+          Welcome back, {profile?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Student'}! 👋
         </h1>
         <p className="text-slate-400 mt-2 text-lg">Here's a quick overview of your account</p>
       </div>

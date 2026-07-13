@@ -9,6 +9,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string, phone?: string, studentId?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; role?: string }>;
   signOut: () => Promise<void>;
+  refreshProfile: () => Promise<void>;
   isAdmin: boolean;
   isDriver: boolean;
 }
@@ -62,8 +63,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const refreshProfile = async () => {
+    if (user) {
+      await loadProfile(user.id);
+    }
+  };
+
   const signUp = async (email: string, password: string, fullName: string, phone?: string, studentId?: string) => {
     try {
+      if (studentId) {
+        const { data: exists, error: checkError } = await supabase.rpc('check_student_id_exists', {
+          p_student_id: studentId
+        });
+        if (checkError) throw checkError;
+        if (exists) {
+          throw new Error('This Student ID is already registered.');
+        }
+      }
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
@@ -71,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: {
             full_name: fullName,
             phone: phone,
-            student_id: studentId,
+            student_id: studentId || undefined,
           }
         }
       });
@@ -115,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isDriver = profile?.role === 'driver';
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, isAdmin, isDriver }}>
+    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile, isAdmin, isDriver }}>
       {children}
     </AuthContext.Provider>
   );
