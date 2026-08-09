@@ -1,12 +1,11 @@
 import { Lock, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from '../../lib/navigation';
+import { Link } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function ResetPassword() {
   const { clearRecovery } = useAuth();
-  const navigate = useNavigate();
   const styles = `
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(20px); }
@@ -40,7 +39,12 @@ export default function ResetPassword() {
       setCountdown((c) => {
         if (c <= 1) {
           clearInterval(interval);
-          navigate('/login');
+          // Sign out AFTER countdown so the component stays mounted during the success screen.
+          // Use window.location.replace for a guaranteed clean navigation to login.
+          supabase.auth.signOut().then(() => {
+            clearRecovery();
+            window.location.replace('/login');
+          });
           return 0;
         }
         return c - 1;
@@ -66,9 +70,7 @@ export default function ResetPassword() {
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
-      // Sign out the recovery session so user must log in fresh with the new password
-      await supabase.auth.signOut();
-      clearRecovery();
+      // Only update password here — signOut happens after the success countdown
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');
