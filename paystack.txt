@@ -49,3 +49,17 @@ Tracks user behavior deeply (how long they stay, where they drop off).
 To set this up: You would need to go to analytics.google.com, create a free account, get a "Measurement ID" (which looks like G-XXXXXXXXXX), and then I can add the tracking script into your index.html file.
 
 Would you like me to go ahead and set up Vercel Web Analytics for you? It only takes a minute, and you'll immediately start seeing visitor counts in your Vercel dashboard online.
+
+
+the Confirm your email address
+Inbox
+
+Supabase Auth <noreply@mail.app.supabase.io>
+
+
+Confirm your email address
+Follow the link below to confirm this email address and finish signing up.
+
+Confirm email address
+
+is not working when i clicked on the comfirm http://localhost:3000/#access_token
