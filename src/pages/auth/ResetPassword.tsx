@@ -1,11 +1,12 @@
 import { Lock, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from '../../lib/navigation';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function ResetPassword() {
   const { clearRecovery } = useAuth();
+  const navigate = useNavigate();
   const styles = `
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(20px); }
@@ -13,6 +14,13 @@ export default function ResetPassword() {
     }
     .animate-in {
       animation: fadeInUp 0.6s ease-out forwards;
+    }
+    @keyframes shrink {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+    .progress-bar {
+      animation: shrink 3s linear forwards;
     }
   `;
 
@@ -23,6 +31,23 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [countdown, setCountdown] = useState(3);
+
+  // Auto-redirect to login 3 seconds after success
+  useEffect(() => {
+    if (!success) return;
+    const interval = setInterval(() => {
+      setCountdown((c) => {
+        if (c <= 1) {
+          clearInterval(interval);
+          navigate('/login');
+          return 0;
+        }
+        return c - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [success]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,14 +102,23 @@ export default function ResetPassword() {
                   <CheckCircle className="text-emerald-400" size={32} />
                 </div>
                 <h1 className="text-3xl font-bold text-white mb-3">Password Reset!</h1>
-                <p className="text-gray-300 mb-8">
-                  Your password has been updated successfully. You can now log in with your new password.
+                <p className="text-gray-300 mb-2">
+                  Your password has been updated successfully.
                 </p>
+                <p className="text-gray-400 text-sm mb-6">
+                  Redirecting you to login in <span className="text-blue-400 font-bold">{countdown}</span> second{countdown !== 1 ? 's' : ''}...
+                </p>
+
+                {/* Progress bar */}
+                <div className="w-full bg-white/10 rounded-full h-1 mb-6 overflow-hidden">
+                  <div className="progress-bar bg-gradient-to-r from-blue-500 to-emerald-500 h-1 rounded-full" />
+                </div>
+
                 <Link
                   to="/login"
                   className="inline-block w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-semibold py-3 px-4 rounded-lg transition transform hover:scale-105 text-center"
                 >
-                  Return to Login
+                  Go to Login now
                 </Link>
               </div>
             ) : (
