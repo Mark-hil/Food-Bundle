@@ -2,8 +2,10 @@ import { Lock, ArrowLeft, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ResetPassword() {
+  const { clearRecovery } = useAuth();
   const styles = `
     @keyframes fadeInUp {
       from { opacity: 0; transform: translateY(20px); }
@@ -39,6 +41,9 @@ export default function ResetPassword() {
     try {
       const { error: updateError } = await supabase.auth.updateUser({ password });
       if (updateError) throw updateError;
+      // Sign out the recovery session so user must log in fresh with the new password
+      await supabase.auth.signOut();
+      clearRecovery();
       setSuccess(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to reset password. Please try again.');

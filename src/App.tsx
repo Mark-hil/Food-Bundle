@@ -62,11 +62,17 @@ import PromoCodes from './pages/admin/PromoCodes';
 import DriverDashboard from './pages/driver/Dashboard';
 
 function AppContent() {
-  const { user, loading, isAdmin, isDriver } = useAuth();
+  const { user, loading, isAdmin, isDriver, isRecoveringPassword } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return <LoadingSpinner />;
+  }
+
+  // If the user arrived via a password reset email, always show the reset page.
+  // This must be checked before any other routing logic.
+  if (isRecoveringPassword) {
+    return <ResetPassword />;
   }
 
   if (!user) {

@@ -1,15 +1,18 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase, Profile } from '../lib/supabase';
+import { AuthChangeEvent } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  isRecoveringPassword: boolean;
   signUp: (email: string, password: string, fullName: string, phone?: string, studentId?: string) => Promise<{ error: Error | null }>;
   signIn: (email: string, password: string) => Promise<{ error: Error | null; role?: string }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  clearRecovery: () => void;
   isAdmin: boolean;
   isDriver: boolean;
 }
@@ -20,6 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -31,13 +35,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event: AuthChangeEvent, session) => {
       (async () => {
+        // When the user clicks the reset link in their email, Supabase fires
+        // PASSWORD_RECOVERY. We must NOT treat this as a normal login — instead
+        // set a flag and redirect to the reset password page.
+        if (event === 'PASSWORD_RECOVERY') {
+          setUser(session?.user ?? null);
+          setIsRecoveringPassword(true);
+          setLoading(false);
+          // Push the path without a full reload so our custom router picks it up
+          window.history.replaceState({}, '', '/reset-password');
+          window.dispatchEvent(new PopStateEvent('popstate'));
+          return;
+        }
+
         setUser(session?.user ?? null);
         if (session?.user) {
           await loadProfile(session.user.id);
         } else {
           setProfile(null);
+          setIsRecoveringPassword(false);
           setLoading(false);
         }
       })();
@@ -125,14 +143,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    setIsRecoveringPassword(false);
     await supabase.auth.signOut();
+  };
+
+  // Called by ResetPassword page after successfully updating the password
+  const clearRecovery = () => {
+    setIsRecoveringPassword(false);
   };
 
   const isAdmin = profile?.role === 'admin';
   const isDriver = profile?.role === 'driver';
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signUp, signIn, signOut, refreshProfile, isAdmin, isDriver }}>
+    <AuthContext.Provider value={{ user, profile, loading, isRecoveringPassword, signUp, signIn, signOut, refreshProfile, clearRecovery, isAdmin, isDriver }}>
       {children}
     </AuthContext.Provider>
   );
