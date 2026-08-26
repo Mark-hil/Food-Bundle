@@ -23,9 +23,10 @@ import CreatePackage from './pages/admin/CreatePackage';
 import EditPackage from './pages/admin/EditPackage';
 import DeliverySchedule from './pages/admin/DeliverySchedule';
 import AdminSettings from './pages/admin/Settings';
+import AdminInventory from './pages/admin/AdminInventory';
 import AdminLogin from './pages/auth/AdminLogin';
 import Home from './pages/public/Home';
-import Packages from './pages/public/Packages';
+
 import About from './pages/public/About';
 import Contact from './pages/public/Contact';
 import FAQ from './pages/public/FAQ';
@@ -79,7 +80,7 @@ function AppContent() {
     if (location.pathname === '/admin/login') {
       return <AdminLogin />;
     }
-    const isPublicPage = ['/', '/packages', '/about', '/contact', '/faq', '/terms', '/privacy', '/refund-policy', '/guest-checkout', '/guest-payment'].includes(location.pathname) || location.pathname.startsWith('/guest-checkout') || location.pathname.startsWith('/guest-payment');
+    const isPublicPage = ['/', '/bundles', '/about', '/contact', '/faq', '/terms', '/privacy', '/refund-policy', '/guest-checkout', '/guest-payment'].includes(location.pathname) || location.pathname.startsWith('/guest-checkout') || location.pathname.startsWith('/guest-payment');
 
     return (
       <div className="pt-16">
@@ -91,9 +92,9 @@ function AppContent() {
             <Footer />
           </>
         )}
-        {location.pathname === '/packages' && (
+        {location.pathname === '/bundles' && (
           <>
-            <PageTransition><Packages /></PageTransition>
+            <PageTransition><Bundles /></PageTransition>
             <Footer />
           </>
         )}
@@ -180,6 +181,7 @@ function AppContent() {
         {location.pathname.startsWith('/admin/packages/') && location.pathname !== '/admin/packages' && location.pathname !== '/admin/packages/new' && <EditPackage />}
         {location.pathname === '/admin/delivery' && <DeliverySchedule />}
         {location.pathname === '/admin/promos' && <PromoCodes />}
+        {location.pathname === '/admin/inventory' && <AdminInventory />}
         {location.pathname === '/admin/settings' && <AdminSettings />}
       </AdminLayout>
     );

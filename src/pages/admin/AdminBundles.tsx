@@ -19,6 +19,32 @@ export default function AdminBundles() {
   });
   const [isCustomizable, setIsCustomizable] = useState(false);
   const [customOptions, setCustomOptions] = useState<{category: string, options: string[], required: boolean, maxSelections: number}[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<{name: string, price: number}[]>([]);
+
+  useEffect(() => {
+    loadBundles();
+    loadInventoryItems();
+  }, []);
+
+  const loadInventoryItems = async () => {
+    try {
+      const { data } = await supabase.from('inventory_items').select('name, price').order('name');
+      if (data) setInventoryItems(data);
+    } catch (e) {
+      console.error('Error loading inventory items', e);
+    }
+  };
+
+  // Auto-calculate price from selected inventory items
+  const recalculatePrice = (itemsString: string) => {
+    const itemNames = itemsString.split(',').map(i => i.trim()).filter(Boolean);
+    let total = 0;
+    itemNames.forEach(name => {
+      const found = inventoryItems.find(inv => inv.name.toLowerCase() === name.toLowerCase());
+      if (found) total += Number(found.price);
+    });
+    return total;
+  };
 
   const addCustomCategory = () => {
     setCustomOptions([...customOptions, { category: '', options: [''], required: true, maxSelections: 1 }]);
@@ -54,9 +80,7 @@ export default function AdminBundles() {
     setCustomOptions(newOpts);
   };
 
-  useEffect(() => {
-    loadBundles();
-  }, []);
+
 
   const loadBundles = async () => {
     try {
@@ -279,18 +303,6 @@ export default function AdminBundles() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Price (GH₵)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50"
-                  required
-                />
-              </div>
-
-              <div>
                 <ImageUpload 
                   value={formData.image_url} 
                   onChange={(url) => setFormData({ ...formData, image_url: url })} 
@@ -304,11 +316,94 @@ export default function AdminBundles() {
                 </label>
                 <textarea
                   value={formData.items}
-                  onChange={(e) => setFormData({ ...formData, items: e.target.value })}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50"
+                  onChange={(e) => {
+                    const newItems = e.target.value;
+                    const newPrice = recalculatePrice(newItems);
+                    setFormData({ ...formData, items: newItems, price: newPrice > 0 ? newPrice.toFixed(2) : formData.price });
+                  }}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50 mb-2"
                   rows={3}
                   placeholder="Rice, Chicken, Vegetables"
                 />
+                
+                {inventoryItems.length > 0 && (
+                  <div className="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                    <p className="text-xs font-medium text-slate-500 mb-2">Quick Add from Inventory:</p>
+                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
+                      {inventoryItems.map((item, idx) => {
+                        const currentItems = formData.items ? formData.items.split(',').map(i => i.trim()).filter(Boolean) : [];
+                        const isSelected = currentItems.some(i => i.toLowerCase() === item.name.toLowerCase());
+                        return (
+                          <button
+                            key={idx}
+                            type="button"
+                            onClick={() => {
+                              let newItemsList: string[];
+                              if (isSelected) {
+                                // Remove item
+                                newItemsList = currentItems.filter(i => i.toLowerCase() !== item.name.toLowerCase());
+                              } else {
+                                // Add item
+                                newItemsList = [...currentItems, item.name];
+                              }
+                              const newItemsStr = newItemsList.join(', ');
+                              const newPrice = recalculatePrice(newItemsStr);
+                              setFormData({ ...formData, items: newItemsStr, price: newPrice > 0 ? newPrice.toFixed(2) : formData.price });
+                            }}
+                            className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium border transition ${
+                              isSelected
+                                ? 'bg-green-100 border-green-400 text-green-800'
+                                : 'bg-white border-slate-200 text-slate-700 hover:bg-green-50 hover:border-green-300 hover:text-green-700'
+                            }`}
+                          >
+                            {isSelected ? '✓' : <Plus className="w-3 h-3 mr-1" />}
+                            <span className="ml-1">{item.name}</span>
+                            <span className="ml-1.5 text-[10px] opacity-70">GH₵{Number(item.price).toFixed(0)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Price with auto-calculated breakdown */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">Price (GH₵)</label>
+                {(() => {
+                  const itemNames = formData.items ? formData.items.split(',').map(i => i.trim()).filter(Boolean) : [];
+                  const matched = itemNames.map(name => {
+                    const found = inventoryItems.find(inv => inv.name.toLowerCase() === name.toLowerCase());
+                    return found ? { name: found.name, price: Number(found.price) } : null;
+                  }).filter(Boolean) as { name: string; price: number }[];
+
+                  return matched.length > 0 ? (
+                    <div className="mb-2 p-2.5 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-[10px] font-semibold text-green-700 uppercase tracking-wide mb-1.5">Auto-calculated Breakdown</p>
+                      <div className="space-y-0.5">
+                        {matched.map((m, i) => (
+                          <div key={i} className="flex justify-between text-xs text-green-800">
+                            <span>{m.name}</span>
+                            <span className="font-medium">GH₵ {m.price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between text-xs font-bold text-green-900 pt-1.5 mt-1.5 border-t border-green-300">
+                          <span>Total</span>
+                          <span>GH₵ {matched.reduce((s, m) => s + m.price, 0).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null;
+                })()}
+                <input
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50"
+                  required
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Auto-calculated from inventory items. You can override manually.</p>
               </div>
 
               <div>

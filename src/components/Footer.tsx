@@ -20,8 +20,8 @@ export default function Footer() {
             <h3 className="text-white font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link to="/packages" className="text-slate-400 hover:text-white transition">
-                  Packages
+                <Link to="/bundles" className="text-slate-400 hover:text-white transition">
+                  Bundles
                 </Link>
               </li>
               <li>

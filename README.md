@@ -5,7 +5,7 @@ Food Bundle is a comprehensive, modern web application designed to provide stude
 ## 🚀 Features
 
 ### For Students
-- **Browse & Order:** View available food packages and bundles.
+- **Browse & Order:** View available food bundles with a unified experience for guests and authenticated users.
 - **Subscriptions:** Subscribe to weekly or monthly meal plans.
 - **Order Tracking:** Real-time delivery tracking for active orders.
 - **Loyalty & Referrals:** Earn points and refer friends for discounts.
@@ -15,7 +15,8 @@ Food Bundle is a comprehensive, modern web application designed to provide stude
 
 ### For Administrators
 - **Dashboard Overview:** Monitor key metrics (orders, revenue, active students).
-- **Package Management:** Create, edit, and manage food bundles.
+- **Inventory Management:** Manage individual product items and automate bundle pricing based on selected inventory.
+- **Bundle & Package Management:** Create, edit, and manage food bundles using Quick Add inventory selection.
 - **Order Management:** View order details and update delivery statuses.
 - **Student Directory:** Manage registered users and their subscriptions.
 - **Delivery Scheduling:** Configure and manage delivery time slots.

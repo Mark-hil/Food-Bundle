@@ -27,6 +27,15 @@ export type CustomizationOption = {
   maxSelections: number;
 };
 
+export type InventoryItem = {
+  id: string;
+  name: string;
+  price: number;
+  category?: string;
+  stock_quantity: number;
+  created_at: string;
+};
+
 export type Bundle = {
   id: string;
   name: string;

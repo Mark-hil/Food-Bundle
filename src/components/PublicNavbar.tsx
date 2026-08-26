@@ -18,8 +18,8 @@ export default function PublicNavbar() {
             <Link to="/" className="text-slate-600 hover:text-slate-900 font-medium transition">
               Home
             </Link>
-            <Link to="/packages" className="text-slate-600 hover:text-slate-900 font-medium transition">
-              Packages
+            <Link to="/bundles" className="text-slate-600 hover:text-slate-900 font-medium transition">
+              Bundles
             </Link>
             <Link to="/about" className="text-slate-600 hover:text-slate-900 font-medium transition">
               About
@@ -53,8 +53,8 @@ export default function PublicNavbar() {
             <Link to="/" className="block px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition">
               Home
             </Link>
-            <Link to="/packages" className="block px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition">
-              Packages
+            <Link to="/bundles" className="block px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition">
+              Bundles
             </Link>
             <Link to="/about" className="block px-4 py-2 text-slate-600 hover:bg-slate-50 rounded-lg transition">
               About

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, CreditCard as Edit } from 'lucide-react';
+import { ArrowLeft, CreditCard as Edit, Plus } from 'lucide-react';
 import ImageUpload from '../../components/ImageUpload';
 
 export default function EditPackage() {
@@ -20,7 +20,20 @@ export default function EditPackage() {
   const [error, setError] = useState('');
   const [isCustomizable, setIsCustomizable] = useState(false);
   const [customOptions, setCustomOptions] = useState<{category: string, options: string[], required: boolean, maxSelections: number}[]>([]);
+  const [inventoryItems, setInventoryItems] = useState<{name: string, price: number}[]>([]);
   const packageId = location.pathname.split('/').pop();
+
+  useEffect(() => {
+    const loadInventory = async () => {
+      try {
+        const { data } = await supabase.from('inventory_items').select('name, price').order('name');
+        if (data) setInventoryItems(data);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    loadInventory();
+  }, []);
 
   const addCustomCategory = () => {
     setCustomOptions([...customOptions, { category: '', options: [''], required: true, maxSelections: 1 }]);
@@ -285,16 +298,44 @@ export default function EditPackage() {
                         </div>
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="block text-xs font-medium text-slate-600">Options</label>
-                        {cat.options.map((opt, optIdx) => (
-                          <div key={optIdx} className="flex gap-2">
-                            <input type="text" value={opt} onChange={e => updateOption(catIdx, optIdx, e.target.value)} placeholder="Option name" className="flex-1 px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-green-500 outline-none text-sm" />
-                            <button type="button" onClick={() => removeOption(catIdx, optIdx)} className="text-slate-400 hover:text-red-500 px-2">×</button>
-                          </div>
-                        ))}
-                        <button type="button" onClick={() => addOption(catIdx)} className="text-xs text-green-600 font-medium hover:text-green-700 mt-2">+ Add Option</button>
-                      </div>
+                        <div className="space-y-2">
+                          <label className="block text-xs font-medium text-slate-600">Options</label>
+                          {cat.options.map((opt, optIdx) => (
+                            <div key={optIdx} className="flex gap-2">
+                              <input type="text" value={opt} onChange={e => updateOption(catIdx, optIdx, e.target.value)} placeholder="Option name" className="flex-1 px-3 py-1.5 border border-slate-300 rounded focus:ring-1 focus:ring-green-500 outline-none text-sm" />
+                              <button type="button" onClick={() => removeOption(catIdx, optIdx)} className="text-slate-400 hover:text-red-500 px-2">×</button>
+                            </div>
+                          ))}
+                          
+                          {inventoryItems.length > 0 && (
+                            <div className="mt-2 pt-2 border-t border-slate-200">
+                              <p className="text-[10px] font-medium text-slate-400 mb-1">Quick Add:</p>
+                              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                {inventoryItems.map((item, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => {
+                                      const emptyIdx = cat.options.findIndex(o => o.trim() === '');
+                                      if (emptyIdx >= 0) {
+                                        updateOption(catIdx, emptyIdx, item.name);
+                                      } else {
+                                        const newOpts = [...customOptions];
+                                        newOpts[catIdx].options.push(item.name);
+                                        setCustomOptions(newOpts);
+                                      }
+                                    }}
+                                    className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-white border border-slate-200 text-slate-600 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition"
+                                  >
+                                    <Plus className="w-2.5 h-2.5 mr-0.5" />
+                                    {item.name}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          <button type="button" onClick={() => addOption(catIdx)} className="text-xs text-green-600 font-medium hover:text-green-700 mt-2">+ Add Option</button>
+                        </div>
                     </div>
                   ))}
                   <button type="button" onClick={addCustomCategory} className="w-full py-2 border-2 border-dashed border-slate-300 text-slate-600 rounded-xl hover:border-green-500 hover:text-green-600 transition font-medium text-sm">

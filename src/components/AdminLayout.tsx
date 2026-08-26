@@ -1,7 +1,7 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLocation, useNavigate } from '../lib/navigation';
-import { ShoppingBag, LayoutDashboard, UtensilsCrossed, Package, Tag, Users, Truck, Settings, LogOut, Menu, X, Bell } from 'lucide-react';
+import { ShoppingBag, LayoutDashboard, UtensilsCrossed, Package, Tag, Users, Truck, Settings, LogOut, Menu, X, Bell, Archive } from 'lucide-react';
 import WhatsAppButton from './WhatsAppButton';
 import PageTransition from './PageTransition';
 import { supabase } from '../lib/supabase';
@@ -86,6 +86,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/bundles', label: 'Bundles', icon: UtensilsCrossed },
     { path: '/admin/orders', label: 'Orders', icon: Package },
+    { path: '/admin/inventory', label: 'Inventory', icon: Archive },
     { path: '/admin/promos', label: 'Promos', icon: Tag },
     { path: '/admin/students', label: 'Students', icon: Users },
     { path: '/admin/delivery', label: 'Delivery', icon: Truck },
