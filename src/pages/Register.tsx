@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { User, Mail, Lock, Phone, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { User, Mail, Lock, Phone, ArrowRight, Eye, EyeOff, Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from '../lib/navigation';
 
@@ -31,7 +31,24 @@ export default function Register() {
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
   const { signUp } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const emailParam = params.get('email');
+    const nameParam = params.get('name');
+    const phoneParam = params.get('phone');
+    const redirectParam = params.get('redirect');
+
+    if (emailParam) setEmail(emailParam);
+    if (nameParam) setFullName(nameParam);
+    if (phoneParam) setPhone(phoneParam);
+    if (redirectParam && redirectParam.includes('/track/')) {
+      const parts = redirectParam.split('/track/');
+      if (parts[1]) setTrackingOrderId(parts[1].slice(0, 8).toUpperCase());
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,6 +85,19 @@ export default function Register() {
         <div className="w-full max-w-md animate-in">
           {/* Card */}
           <div className="bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl p-8">
+            {/* Tracking banner if coming from guest order */}
+            {trackingOrderId && !success && (
+              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-3.5 mb-6 flex items-center gap-3">
+                <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
+                  <Package size={18} />
+                </div>
+                <div className="text-xs">
+                  <p className="font-bold text-white">Track Order #{trackingOrderId}</p>
+                  <p className="text-slate-300">Set your password to track live delivery and driver ETA.</p>
+                </div>
+              </div>
+            )}
+
             {/* Header */}
             <div className="text-center mb-8">
               <h1 className="text-4xl font-bold text-white mb-2">

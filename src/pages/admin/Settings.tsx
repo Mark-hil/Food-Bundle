@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Save, Building2, Truck, Percent } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import DeliveryZonesManager from '../../components/admin/DeliveryZonesManager';
 
 export default function Settings() {
   const [settings, setSettings] = useState({
@@ -13,6 +14,8 @@ export default function Settings() {
     freeDeliveryThreshold: '700.00',
     subscriptionFoodDiscountPercent: '40',
     subscriptionDeliveryDiscountPercent: '20',
+    driverPayoutPercent: '90',
+    driverBatchBonus: '5.00',
     loyaltyEarnStepAmount: '10.00',
     loyaltyEarnStepPoints: '10',
     loyaltyRedemptionRatio: '100',
@@ -127,6 +130,8 @@ export default function Settings() {
           freeDeliveryThreshold: Number(data.free_delivery_threshold || 700).toFixed(2),
           subscriptionFoodDiscountPercent: Number(data.subscription_food_discount_percent || 40).toString(),
           subscriptionDeliveryDiscountPercent: Number(data.subscription_delivery_discount_percent || 20).toString(),
+          driverPayoutPercent: Number(data.driver_payout_percent || 90).toString(),
+          driverBatchBonus: Number(data.driver_batch_bonus || 5).toFixed(2),
           loyaltyEarnStepAmount: Number(data.loyalty_earn_step_amount || 10).toFixed(2),
           loyaltyEarnStepPoints: Number(data.loyalty_earn_step_points || 10).toString(),
           loyaltyRedemptionRatio: Number(data.loyalty_redemption_ratio || 100).toString(),
@@ -166,6 +171,8 @@ export default function Settings() {
           free_delivery_threshold: Number(settings.freeDeliveryThreshold),
           subscription_food_discount_percent: Number(settings.subscriptionFoodDiscountPercent),
           subscription_delivery_discount_percent: Number(settings.subscriptionDeliveryDiscountPercent),
+          driver_payout_percent: Number(settings.driverPayoutPercent),
+          driver_batch_bonus: Number(settings.driverBatchBonus),
           loyalty_earn_step_amount: Number(settings.loyaltyEarnStepAmount),
           loyalty_earn_step_points: Number(settings.loyaltyEarnStepPoints),
           loyalty_redemption_ratio: Number(settings.loyaltyRedemptionRatio),
@@ -215,6 +222,9 @@ export default function Settings() {
             <span>Settings saved successfully!</span>
           </div>
         )}
+
+        {/* Interactive Delivery Zones & Campus Pricing Manager */}
+        <DeliveryZonesManager />
 
         <div className="bg-white rounded-2xl shadow-sm p-8 border border-slate-200">
           <form onSubmit={handleSubmit} className="space-y-8">
@@ -368,6 +378,47 @@ export default function Settings() {
                     className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                   />
                   <p className="text-xs text-slate-500 mt-1">Percentage off the delivery fee for subscribers (if they don't qualify for Free Delivery).</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center mb-6">
+                <Truck className="w-5 h-5 text-emerald-600 mr-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Driver Payout & Logistics Settings</h2>
+              </div>
+              <div className="border-t border-slate-200 pt-6 grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Driver Payout Share (%)
+                  </label>
+                  <input
+                    type="number"
+                    name="driverPayoutPercent"
+                    value={settings.driverPayoutPercent}
+                    onChange={handleChange}
+                    step="1"
+                    min="50"
+                    max="100"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Percentage of the customer delivery fee paid to drivers (e.g. 90% pays GH₵ 9 on a GH₵ 10 delivery).</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Batch Drop Bonus (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="driverBatchBonus"
+                    value={settings.driverBatchBonus}
+                    onChange={handleChange}
+                    step="0.50"
+                    min="0"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Extra bonus paid to the driver for each additional package delivered to the same hostel/hall in one run.</p>
                 </div>
               </div>
             </div>

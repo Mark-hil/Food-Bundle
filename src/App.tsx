@@ -63,7 +63,7 @@ import PromoCodes from './pages/admin/PromoCodes';
 import DriverDashboard from './pages/driver/Dashboard';
 
 function AppContent() {
-  const { user, loading, isAdmin, isDriver, isRecoveringPassword } = useAuth();
+  const { user, loading, isAdmin, isDriver, isSupport, isPacker, isRecoveringPassword } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -80,7 +80,28 @@ function AppContent() {
     if (location.pathname === '/admin/login') {
       return <AdminLogin />;
     }
-    const isPublicPage = ['/', '/bundles', '/about', '/contact', '/faq', '/terms', '/privacy', '/refund-policy', '/guest-checkout', '/guest-payment'].includes(location.pathname) || location.pathname.startsWith('/guest-checkout') || location.pathname.startsWith('/guest-payment');
+    const isPublicPage = [
+      '/', 
+      '/bundles', 
+      '/about', 
+      '/contact', 
+      '/faq', 
+      '/terms', 
+      '/privacy', 
+      '/refund-policy', 
+      '/guest-checkout', 
+      '/guest-payment',
+      '/payment',
+      '/payment/success',
+      '/payment/failed',
+      '/payment/confirm'
+    ].includes(location.pathname) || 
+    location.pathname.startsWith('/guest-checkout') || 
+    location.pathname.startsWith('/guest-payment') ||
+    location.pathname.startsWith('/payment/success') ||
+    location.pathname.startsWith('/payment/failed') ||
+    location.pathname.startsWith('/payment/confirm') ||
+    location.pathname.startsWith('/track/');
 
     return (
       <div className="pt-16">
@@ -137,11 +158,47 @@ function AppContent() {
         {location.pathname === '/register' && <PageTransition><Register /></PageTransition>}
         {location.pathname === '/guest-checkout' && <PageTransition><GuestCheckout /></PageTransition>}
         {location.pathname === '/guest-payment' && <PageTransition><GuestPayment /></PageTransition>}
+        {location.pathname === '/payment/success' && (
+          <>
+            <PageTransition><PaymentSuccess /></PageTransition>
+            <Footer />
+          </>
+        )}
+        {location.pathname === '/payment/failed' && (
+          <>
+            <PageTransition><PaymentFailed /></PageTransition>
+            <Footer />
+          </>
+        )}
+        {location.pathname === '/payment/confirm' && (
+          <>
+            <PageTransition><PaymentConfirm /></PageTransition>
+            <Footer />
+          </>
+        )}
+        {location.pathname.startsWith('/track/') && (
+          <>
+            <PageTransition><TrackDelivery /></PageTransition>
+            <Footer />
+          </>
+        )}
         {location.pathname === '/forgot-password' && <ForgotPassword />}
         {location.pathname.startsWith('/reset-password') && <ResetPassword />}
         {location.pathname.startsWith('/verify-email') && <VerifyEmail />}
         {location.pathname === '/resend-verification' && <ResendVerification />}
-        {!isPublicPage && location.pathname !== '/register' && location.pathname !== '/guest-checkout' && location.pathname !== '/guest-payment' && location.pathname !== '/forgot-password' && !location.pathname.startsWith('/reset-password') && !location.pathname.startsWith('/verify-email') && location.pathname !== '/resend-verification' && <Login />}
+        {!isPublicPage && 
+         location.pathname !== '/register' && 
+         location.pathname !== '/guest-checkout' && 
+         location.pathname !== '/guest-payment' && 
+         location.pathname !== '/payment/success' && 
+         location.pathname !== '/payment/failed' && 
+         location.pathname !== '/payment/confirm' && 
+         !location.pathname.startsWith('/track/') &&
+         location.pathname !== '/forgot-password' && 
+         !location.pathname.startsWith('/reset-password') && 
+         !location.pathname.startsWith('/verify-email') && 
+         location.pathname !== '/resend-verification' && 
+         <Login />}
       </div>
     );
   }
@@ -165,18 +222,47 @@ function AppContent() {
     return <DriverDashboard />;
   }
 
-  // Render admin routes with AdminLayout
+  // Handle support and packer routing — they use admin layout with restricted nav
+  if ((isSupport || isPacker) && isAdminRoute) {
+    return (
+      <AdminLayout>
+        {location.pathname === '/admin' && <AdminOrders />}
+        {location.pathname === '/admin/orders' && <AdminOrders />}
+        {location.pathname.startsWith('/admin/orders/') && <AdminOrderDetails />}
+        {location.pathname === '/admin/students' && <Students />}
+        {location.pathname.startsWith('/admin/students/') && <StudentDetails />}
+      </AdminLayout>
+    );
+  }
+
+  // Redirect support/packer to admin if they're not on an admin route
+  if (isSupport || isPacker) {
+    const SupportPackerRedirect = () => {
+      const navigate = useNavigate();
+      useEffect(() => {
+        navigate('/admin/orders');
+      }, []);
+      return <AdminOrders />;
+    };
+    return (
+      <AdminLayout>
+        <SupportPackerRedirect />
+      </AdminLayout>
+    );
+  }
+
+  // Render admin routes with AdminLayout (covers admin + super_admin)
   if (isAdmin && isAdminRoute) {
     return (
       <AdminLayout>
         {location.pathname === '/admin' && <AdminDashboard />}
         {location.pathname === '/admin/dashboard' && <AdminDashboard />}
         {location.pathname === '/admin/bundles' && <AdminBundles />}
-        {location.pathname === '/admin/packages' && <AdminBundles />}
         {location.pathname === '/admin/orders' && <AdminOrders />}
         {location.pathname.startsWith('/admin/orders/') && <AdminOrderDetails />}
         {location.pathname === '/admin/students' && <Students />}
         {location.pathname.startsWith('/admin/students/') && <StudentDetails />}
+        {location.pathname === '/admin/packages' && <AdminBundles />}
         {location.pathname === '/admin/packages/new' && <CreatePackage />}
         {location.pathname.startsWith('/admin/packages/') && location.pathname !== '/admin/packages' && location.pathname !== '/admin/packages/new' && <EditPackage />}
         {location.pathname === '/admin/delivery' && <DeliverySchedule />}

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as crypto from "node:crypto";
 
 const corsHeaders = {
@@ -38,7 +38,6 @@ serve(async (req) => {
     
     if (!isValid) {
       console.error("Invalid Paystack signature. Mismatch between generated hash and x-paystack-signature.");
-      console.error("HINT: Please double check that your PAYSTACK_SECRET_KEY in Supabase exactly matches the Secret Key (Test or Live) in your Paystack Dashboard.");
       return new Response("Invalid signature", { status: 401, headers: corsHeaders });
     }
 
@@ -50,18 +49,66 @@ serve(async (req) => {
       const email = data.customer.email;
       const amount = data.amount / 100; // Paystack sends amount in kobo/cents
       const reference = data.reference;
-      const currency = data.currency || "NGN";
+      const currency = data.currency || "GHS";
 
-      // Extract a short, simple order ID from the long reference string
-      // e.g. "ORDER-b937fbde-0419-45ba..." -> "B937FBDE"
-      const shortOrderId = reference.replace('ORDER-', '').split('-')[0].toUpperCase();
+      const orderId = data.metadata?.orderId;
+      const shortOrderId = orderId ? orderId.slice(0, 8).toUpperCase() : reference.replace('ORDER-', '').split('-')[0].toUpperCase();
+
+      // 1. Update Database Status to 'confirmed' using Supabase Admin Client
+      const supabaseUrl = Deno.env.get("SUPABASE_URL");
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+      if (supabaseUrl && supabaseServiceKey && orderId) {
+        try {
+          const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+          // Check if in registered orders
+          const { data: regOrder } = await supabase
+            .from('orders')
+            .select('id')
+            .eq('id', orderId)
+            .maybeSingle();
+
+          if (regOrder) {
+            await supabase
+              .from('orders')
+              .update({ status: 'confirmed' })
+              .eq('id', orderId);
+
+            await supabase
+              .from('transactions')
+              .update({ status: 'success', payment_reference: reference })
+              .eq('order_id', orderId);
+          } else {
+            // Guest order
+            await supabase
+              .from('guest_orders')
+              .update({
+                status: 'confirmed',
+                payment_status: 'success',
+                payment_reference: reference,
+              })
+              .eq('id', orderId);
+          }
+
+          // Call RPC for any custom database triggers
+          await supabase.rpc('simulate_payment_success', {
+            p_order_id: orderId,
+            p_is_guest: !regOrder,
+          });
+        } catch (dbErr) {
+          console.error("Error updating order in database via webhook:", dbErr);
+        }
+      }
 
       const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
       
       if (!RESEND_API_KEY) {
-        console.error("RESEND_API_KEY is not set");
-        // We still return 200 to Paystack so it doesn't retry
-        return new Response("Email service unavailable", { status: 200, headers: corsHeaders });
+        console.warn("RESEND_API_KEY is not set - skipping email receipt");
+        return new Response(JSON.stringify({ status: "success", message: "Order confirmed without email" }), { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        });
       }
 
       // Send the branded email receipt using Resend

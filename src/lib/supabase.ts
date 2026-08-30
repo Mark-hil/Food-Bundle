@@ -15,7 +15,7 @@ export type Profile = {
   full_name: string;
   phone?: string;
   student_id?: string;
-  role: 'student' | 'admin' | 'driver';
+  role: 'student' | 'admin' | 'super_admin' | 'driver' | 'support' | 'packer';
   created_at: string;
   updated_at: string;
 };
@@ -45,6 +45,8 @@ export type Bundle = {
   items: string[];
   available: boolean;
   delivery_days: string[];
+  duration_days?: number;
+  items_per_week?: number;
   is_customizable?: boolean;
   customization_options?: CustomizationOption[];
   created_at: string;

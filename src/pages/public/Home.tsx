@@ -4,6 +4,7 @@ import { Link } from '../../lib/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 import SEO from '../../components/SEO';
+import { sortBundlesWithAlphaBetaGamma } from '../../lib/bundleUtils';
 
 export default function Home() {
   const { user } = useAuth();
@@ -19,15 +20,14 @@ export default function Home() {
       const { data, error } = await supabase
         .from('bundles')
         .select('*')
-        .in('name', ['ALPHA', 'BETA', 'GAMMA'])
-        .eq('available', true)
-        .order('price', { ascending: false });
+        .eq('available', true);
 
       if (error) {
         console.error('Supabase error:', error);
         throw error;
       }
-      setPackages(data || []);
+      const sorted = sortBundlesWithAlphaBetaGamma(data || []);
+      setPackages(sorted.slice(0, 6));
     } catch (err) {
       console.error('Error loading packages:', err);
       setPackages([]);
@@ -159,7 +159,7 @@ export default function Home() {
                 Our Featured Packages
               </h2>
               <p className="text-gray-400 animate-in" style={{ animationDelay: '0.1s' }}>
-                Choose from our three premium food bundles tailored for every budget
+                Nutritious, chef-prepared food packages tailored for student life & budget
               </p>
             </div>
 
@@ -176,11 +176,12 @@ export default function Home() {
                     style={{ animationDelay: `${0.2 + idx * 0.15}s` }}
                   >
                     <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-blue-500/50 transition-all duration-300 transform hover:scale-105 cursor-pointer flex flex-col relative">
-                      {/* Badge */}
-                      <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-4 py-1 rounded-full text-xs font-bold z-10 shadow-lg">
-                        {pkg.name === 'ALPHA' && '⭐ Premium'}
-                        {pkg.name === 'BETA' && '⭐ Popular'}
-                        {pkg.name === 'GAMMA' && '⭐ Essential'}
+                      {/* Dynamic Badge */}
+                      <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-3.5 py-1 rounded-full text-xs font-bold z-10 shadow-lg">
+                        {pkg.name === 'ALPHA' && '⭐ Premium Pack'}
+                        {pkg.name === 'BETA' && '⭐ Most Popular'}
+                        {pkg.name === 'GAMMA' && '⭐ Best Value'}
+                        {pkg.name !== 'ALPHA' && pkg.name !== 'BETA' && pkg.name !== 'GAMMA' && (pkg.is_customizable ? '✨ Customizable' : '⭐ Fresh Selection')}
                       </div>
 
                       {/* Image Display */}
@@ -199,7 +200,7 @@ export default function Home() {
                         {/* Header */}
                         <div className="mb-4">
                           <h3 className="text-2xl font-bold text-white mb-2">{pkg.name}</h3>
-                          <p className="text-gray-400 text-sm line-clamp-2">{pkg.description}</p>
+                          <p className="text-gray-400 text-sm line-clamp-2">{pkg.description || 'Delicious, freshly prepped meal package.'}</p>
                         </div>
 
                         {/* Items List */}
@@ -223,21 +224,29 @@ export default function Home() {
                           </p>
                         </div>
 
-                        {/* Action Button */}
+                        {/* Action Buttons */}
                         {user ? (
                           <Link
                             to={`/checkout?bundle=${pkg.id}`}
-                            className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white py-3 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 font-semibold transition transform hover:scale-105 text-center block"
+                            className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white py-3 rounded-xl hover:shadow-lg hover:shadow-blue-500/50 font-semibold transition transform hover:scale-105 text-center block"
                           >
                             Order Now
                           </Link>
                         ) : (
-                          <Link
-                            to="/register"
-                            className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white py-3 rounded-lg hover:shadow-lg hover:shadow-blue-500/50 font-semibold transition transform hover:scale-105 text-center block"
-                          >
-                            Sign Up to Order
-                          </Link>
+                          <div className="space-y-2">
+                            <Link
+                              to={`/guest-checkout?bundle=${pkg.id}`}
+                              className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white py-3 rounded-xl hover:shadow-lg hover:shadow-blue-500/50 font-semibold transition transform hover:scale-105 text-center block text-sm"
+                            >
+                              Order as Guest
+                            </Link>
+                            <Link
+                              to="/register"
+                              className="w-full bg-white/10 hover:bg-white/15 text-gray-300 hover:text-white py-2 rounded-xl text-xs font-medium text-center block transition border border-white/10"
+                            >
+                              Sign up for Weekly Subscriptions
+                            </Link>
+                          </div>
                         )}
                       </div>
                     </div>

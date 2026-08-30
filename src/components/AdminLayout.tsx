@@ -32,7 +32,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       .subscribe();
 
     return () => {
-      orderSub.unsubscribe();
+      supabase.removeChannel(orderSub);
     };
   }, [user]);
 
@@ -80,18 +80,51 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return <>{children}</>;
   }
 
-  const isActive = (path: string) => location.pathname === path;
+  const isActive = (path: string) => 
+    location.pathname === path || (path !== '/admin' && location.pathname.startsWith(path));
 
-  const adminNavItems = [
+  const role = profile.role;
+
+  // Full nav for admin and super_admin
+  const fullAdminNavItems = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/bundles', label: 'Bundles', icon: UtensilsCrossed },
     { path: '/admin/orders', label: 'Orders', icon: Package },
     { path: '/admin/inventory', label: 'Inventory', icon: Archive },
     { path: '/admin/promos', label: 'Promos', icon: Tag },
-    { path: '/admin/students', label: 'Students', icon: Users },
+    { path: '/admin/students', label: 'Users', icon: Users },
     { path: '/admin/delivery', label: 'Delivery', icon: Truck },
     { path: '/admin/settings', label: 'Settings', icon: Settings },
   ];
+
+  // Restricted nav for support role
+  const supportNavItems = [
+    { path: '/admin/orders', label: 'Orders', icon: Package },
+    { path: '/admin/students', label: 'Users', icon: Users },
+  ];
+
+  // Restricted nav for packer role
+  const packerNavItems = [
+    { path: '/admin/orders', label: 'Orders', icon: Package },
+  ];
+
+  const adminNavItems = role === 'support'
+    ? supportNavItems
+    : role === 'packer'
+      ? packerNavItems
+      : fullAdminNavItems;
+
+  const getRoleBadge = () => {
+    switch (role) {
+      case 'super_admin': return { label: 'Super Admin', class: 'bg-rose-500/20 text-rose-400 border-rose-500/30' };
+      case 'admin': return { label: 'Admin', class: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' };
+      case 'support': return { label: 'Support', class: 'bg-sky-500/20 text-sky-400 border-sky-500/30' };
+      case 'packer': return { label: 'Packer', class: 'bg-amber-500/20 text-amber-400 border-amber-500/30' };
+      default: return { label: role, class: 'bg-slate-500/20 text-slate-400 border-slate-500/30' };
+    }
+  };
+
+  const roleBadge = getRoleBadge();
 
   return (
     <div className="h-screen bg-[#F8FAFC] flex font-sans overflow-hidden">
@@ -162,7 +195,13 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
             {/* Page Title */}
             <div className="flex-1">
               <h1 className="text-xl font-bold text-slate-900 font-display">
-                {adminNavItems.find(item => isActive(item.path))?.label || 'Admin'}
+                {location.pathname.startsWith('/admin/orders/') 
+                  ? 'Order Details' 
+                  : location.pathname.startsWith('/admin/students/') 
+                    ? 'User Details'
+                    : location.pathname.startsWith('/admin/packages/')
+                      ? 'Package Editor'
+                      : (adminNavItems.find(item => item.path === location.pathname)?.label || 'Admin Portal')}
               </h1>
             </div>
 
@@ -239,7 +278,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               {/* Admin User Info */}
               <div className="text-right hidden sm:block border-l border-slate-200 pl-4">
                 <p className="text-sm font-medium text-gray-900">{profile.full_name || 'Admin'}</p>
-                <p className="text-xs text-gray-500">{profile.email}</p>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold border ${roleBadge.class}`}>
+                  {roleBadge.label}
+                </span>
               </div>
               <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-full flex items-center justify-center text-white font-bold shadow-inner">
                 {profile.full_name?.[0]?.toUpperCase() || 'A'}

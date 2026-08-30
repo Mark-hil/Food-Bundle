@@ -39,10 +39,12 @@ export default function Login() {
       setError(error.message);
       setLoading(false);
     } else {
-      if (role === 'admin') {
+      if (role === 'admin' || role === 'super_admin') {
         navigate('/admin/dashboard');
       } else if (role === 'driver') {
         navigate('/driver/dashboard');
+      } else if (role === 'support' || role === 'packer') {
+        navigate('/admin/orders');
       } else {
         navigate('/dashboard');
       }

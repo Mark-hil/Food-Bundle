@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Bundle, CustomizationOption } from '../lib/supabase';
+import { useState, useEffect } from 'react';
+import { Bundle } from '../lib/supabase';
 import { X, CheckCircle, Info } from 'lucide-react';
 
 interface CustomizationModalProps {

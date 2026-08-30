@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
-import { Search, X, Loader, Lock, CheckCircle2, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
+import { Search, X, Loader, Lock, CheckCircle2, ChevronLeft, ChevronRight, Phone, Headset, PackageCheck, Eye } from 'lucide-react';
 
 interface OrderWithDetails {
   id: string;
@@ -33,6 +35,9 @@ interface OrderWithDetails {
 }
 
 export default function AdminOrders() {
+  const navigate = useNavigate();
+  const { isSupport, isPacker } = useAuth();
+
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
@@ -77,7 +82,7 @@ export default function AdminOrders() {
       .subscribe();
 
     return () => {
-      ordersSubscription.unsubscribe();
+      supabase.removeChannel(ordersSubscription);
     };
   }, [filter, tab]);
 
@@ -133,13 +138,22 @@ export default function AdminOrders() {
           guestQuery = guestQuery.eq('status', filter);
         }
 
-        const { data: guestData, error: guestError } = await guestQuery;
-        if (guestError) throw guestError;
-        if (guestData) {
-          allOrders.push(...guestData.map((o: any) => ({ ...o, source: 'guest' as const, student_id: undefined, student: undefined })));
+        const { data, error } = await guestQuery;
+        if (error) throw error;
+        if (data) {
+          allOrders.push(...data.map((o: any) => ({ 
+            ...o, 
+            source: 'guest' as const,
+            student: {
+              full_name: o.full_name,
+              email: o.email,
+              phone: o.phone
+            }
+          })));
         }
       }
 
+      // Sort combined orders by date descending
       allOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOrders(allOrders);
     } catch (error) {
@@ -150,11 +164,17 @@ export default function AdminOrders() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string, source: 'registered' | 'guest' | 'subscriptions') => {
+    if (isSupport) return;
     try {
       const table = source === 'guest' ? 'guest_orders' : 'orders';
+      const updatePayload: Record<string, any> = { status: newStatus };
+      if (source !== 'guest' && ['pending', 'confirmed', 'preparing'].includes(newStatus)) {
+        updatePayload.driver_id = null;
+      }
+
       const { error } = await supabase
         .from(table)
-        .update({ status: newStatus })
+        .update(updatePayload)
         .eq('id', orderId);
 
       if (error) throw error;
@@ -166,6 +186,7 @@ export default function AdminOrders() {
   };
 
   const handleStatusChange = (orderId: string, newStatus: string, source: 'registered' | 'guest' | 'subscriptions', pickupPin?: string) => {
+    if (isSupport) return;
     if (newStatus === 'delivered' && pickupPin) {
       setPinData({ orderId, source });
       setShowPinModal(true);
@@ -189,6 +210,7 @@ export default function AdminOrders() {
   };
 
   const handleQuickPinSubmit = () => {
+    if (isSupport || isPacker) return;
     if (quickPin.length !== 4) return;
     
     // Find order with matching PIN that is ready
@@ -202,7 +224,6 @@ export default function AdminOrders() {
       setQuickPin('');
       setQuickPinError('');
       
-      // Clear success message after 4 seconds
       setTimeout(() => {
         setQuickPinSuccess('');
       }, 4000);
@@ -213,6 +234,7 @@ export default function AdminOrders() {
   };
 
   const toggleSelect = (orderId: string) => {
+    if (isSupport) return;
     setSelectedOrders(prev =>
       prev.includes(orderId)
         ? prev.filter(id => id !== orderId)
@@ -221,6 +243,7 @@ export default function AdminOrders() {
   };
 
   const toggleSelectAll = () => {
+    if (isSupport) return;
     if (selectedOrders.length === filteredOrders.length) {
       setSelectedOrders([]);
     } else {
@@ -229,7 +252,7 @@ export default function AdminOrders() {
   };
 
   const updateBulkStatus = async (newStatus: string) => {
-    if (selectedOrders.length === 0) return;
+    if (isSupport || selectedOrders.length === 0) return;
 
     try {
       setBulkUpdating(true);
@@ -277,56 +300,33 @@ export default function AdminOrders() {
     { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length },
   ];
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'confirmed':
-        return 'bg-blue-100 text-blue-800';
-      case 'preparing':
-        return 'bg-purple-100 text-purple-800';
-      case 'ready':
-        return 'bg-teal-100 text-teal-800';
-      case 'out_for_delivery':
-        return 'bg-orange-100 text-orange-800';
-      default:
-        return 'bg-slate-100 text-slate-800';
-    }
-  };
-
   const getStatusBgColor = (status: string) => {
     switch (status) {
-      case 'delivered':
-        return 'bg-green-600 text-white';
-      case 'cancelled':
-        return 'bg-red-600 text-white';
       case 'pending':
-        return 'bg-yellow-600 text-white';
+        return 'bg-yellow-50 text-yellow-800 border-yellow-200';
       case 'confirmed':
-        return 'bg-blue-600 text-white';
+        return 'bg-blue-50 text-blue-800 border-blue-200';
       case 'preparing':
-        return 'bg-purple-600 text-white';
+        return 'bg-purple-50 text-purple-800 border-purple-200';
       case 'ready':
-        return 'bg-teal-600 text-white';
-      case 'out_for_delivery':
-        return 'bg-orange-500 text-white';
+        return 'bg-teal-50 text-teal-800 border-teal-200';
+      case 'delivered':
+        return 'bg-green-50 text-green-800 border-green-200';
+      case 'cancelled':
+        return 'bg-red-50 text-red-800 border-red-200';
       default:
-        return 'bg-slate-600 text-white';
+        return 'bg-slate-50 text-slate-800 border-slate-200';
     }
   };
 
   const getCustomerName = (order: OrderWithDetails) => {
-    if (order.source === 'guest') return order.full_name || 'Guest';
-    return order.student?.full_name || 'Unknown';
+    if (order.source === 'guest') return order.full_name || 'Guest User';
+    return order.student?.full_name || 'Anonymous Student';
   };
 
   const getCustomerEmail = (order: OrderWithDetails) => {
-    if (order.source === 'guest') return order.email || '';
-    return order.student?.email || '';
+    if (order.source === 'guest') return order.email || 'No email provided';
+    return order.student?.email || 'No email provided';
   };
 
   const getCustomerPhone = (order: OrderWithDetails) => {
@@ -367,6 +367,21 @@ export default function AdminOrders() {
 
   return (
     <div className="space-y-6">
+      {/* Role Notice Banners */}
+      {isSupport && (
+        <div className="bg-sky-50 border border-sky-200 text-sky-800 px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-semibold">
+          <Headset size={16} className="text-sky-600" />
+          <span>Support View (Read-Only) — You can search, inspect orders, and verify customer information.</span>
+        </div>
+      )}
+
+      {isPacker && (
+        <div className="bg-teal-50 border border-teal-200 text-teal-800 px-4 py-2.5 rounded-xl flex items-center gap-2 text-xs font-semibold">
+          <PackageCheck size={16} className="text-teal-600" />
+          <span>Packer View (Kitchen Queue) — Prepare and mark confirmed orders as Ready for driver pickup.</span>
+        </div>
+      )}
+
       {/* Filter Bar - Status Pills */}
       <div className="overflow-x-auto pb-2">
         <div className="flex gap-2 min-w-max">
@@ -429,36 +444,38 @@ export default function AdminOrders() {
           />
         </div>
 
-        {/* Quick PIN Entry */}
-        <div className="relative w-full md:w-80 shrink-0">
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <Lock size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-emerald-500" />
-              <input
-                type="text"
-                maxLength={4}
-                placeholder="Fast PIN Entry"
-                value={quickPin}
-                onChange={(e) => {
-                  setQuickPin(e.target.value.replace(/\D/g, ''));
-                  setQuickPinError('');
-                  setQuickPinSuccess('');
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && handleQuickPinSubmit()}
-                className="w-full pl-11 pr-4 py-3 border border-emerald-200 bg-emerald-50/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono font-bold tracking-[0.2em] text-slate-900 placeholder:tracking-normal placeholder:font-sans placeholder:font-normal"
-              />
+        {/* Quick PIN Entry (Hidden for Support & Packer) */}
+        {!isSupport && !isPacker && (
+          <div className="relative w-full md:w-80 shrink-0">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <Lock size={18} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-emerald-500" />
+                <input
+                  type="text"
+                  maxLength={4}
+                  placeholder="Fast PIN Entry"
+                  value={quickPin}
+                  onChange={(e) => {
+                    setQuickPin(e.target.value.replace(/\D/g, ''));
+                    setQuickPinError('');
+                    setQuickPinSuccess('');
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleQuickPinSubmit()}
+                  className="w-full pl-11 pr-4 py-3 border border-emerald-200 bg-emerald-50/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 font-mono font-bold tracking-[0.2em] text-slate-900 placeholder:tracking-normal placeholder:font-sans placeholder:font-normal"
+                />
+              </div>
+              <button
+                onClick={handleQuickPinSubmit}
+                disabled={quickPin.length !== 4}
+                className="px-6 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap shadow-sm"
+              >
+                Verify
+              </button>
             </div>
-            <button
-              onClick={handleQuickPinSubmit}
-              disabled={quickPin.length !== 4}
-              className="px-6 bg-emerald-600 text-white font-bold rounded-2xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap shadow-sm"
-            >
-              Verify
-            </button>
+            {quickPinError && <p className="absolute -bottom-5 left-2 text-[11px] text-red-500 font-medium">{quickPinError}</p>}
+            {quickPinSuccess && <p className="absolute -bottom-5 left-2 text-[11px] text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 size={12} />{quickPinSuccess}</p>}
           </div>
-          {quickPinError && <p className="absolute -bottom-5 left-2 text-[11px] text-red-500 font-medium">{quickPinError}</p>}
-          {quickPinSuccess && <p className="absolute -bottom-5 left-2 text-[11px] text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 size={12} />{quickPinSuccess}</p>}
-        </div>
+        )}
       </div>
 
       {/* Table */}
@@ -470,8 +487,8 @@ export default function AdminOrders() {
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          {/* Select All Checkbox */}
-          {filteredOrders.length > 0 && (
+          {/* Select All Checkbox (Hidden for Support) */}
+          {!isSupport && filteredOrders.length > 0 && (
             <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex items-center gap-3">
               <input
                 type="checkbox"
@@ -492,14 +509,16 @@ export default function AdminOrders() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50">
-                  <th className="px-6 py-4 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
-                      onChange={toggleSelectAll}
-                      className="w-5 h-5 rounded border-slate-300 cursor-pointer text-green-600 focus:ring-green-500"
-                    />
-                  </th>
+                  {!isSupport && (
+                    <th className="px-6 py-4 text-left">
+                      <input
+                        type="checkbox"
+                        checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                        onChange={toggleSelectAll}
+                        className="w-5 h-5 rounded border-slate-300 cursor-pointer text-green-600 focus:ring-green-500"
+                      />
+                    </th>
+                  )}
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Customer</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Bundle</th>
                   <th className="px-6 py-4 text-left text-sm font-semibold text-slate-900">Qty</th>
@@ -518,20 +537,30 @@ export default function AdminOrders() {
                       index % 2 === 1 ? 'bg-slate-50' : 'bg-white'
                     }`}
                   >
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        checked={selectedOrders.includes(order.id)}
-                        onChange={() => toggleSelect(order.id)}
-                        className="w-5 h-5 rounded border-slate-300 cursor-pointer text-green-600 focus:ring-green-500"
-                      />
-                    </td>
+                    {!isSupport && (
+                      <td className="px-6 py-4">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrders.includes(order.id)}
+                          onChange={() => toggleSelect(order.id)}
+                          className="w-5 h-5 rounded border-slate-300 cursor-pointer text-green-600 focus:ring-green-500"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4">
                       <div className="text-sm">
-                        <p className="font-mono text-[11px] font-semibold text-slate-400 mb-0.5 uppercase tracking-wider">
+                        <button
+                          onClick={() => navigate(`/admin/orders/${order.id}`)}
+                          className="font-mono text-[11px] font-semibold text-emerald-700 hover:text-emerald-900 mb-0.5 uppercase tracking-wider hover:underline flex items-center gap-1 text-left"
+                        >
                           #{order.id.slice(0, 8)}
+                        </button>
+                        <p 
+                          onClick={() => navigate(`/admin/orders/${order.id}`)}
+                          className="font-medium text-slate-900 hover:text-emerald-700 cursor-pointer transition"
+                        >
+                          {getCustomerName(order)}
                         </p>
-                        <p className="font-medium text-slate-900">{getCustomerName(order)}</p>
                         <p className="text-slate-500">{getCustomerEmail(order)}</p>
                         {getCustomerPhone(order) && (
                           <a href={`tel:${getCustomerPhone(order)}`} className="text-slate-600 hover:text-blue-600 transition-colors flex items-center gap-1 mt-0.5 w-max">
@@ -542,7 +571,12 @@ export default function AdminOrders() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-slate-900">{order.bundle?.name || 'Unknown'}</p>
+                      <p 
+                        onClick={() => navigate(`/admin/orders/${order.id}`)}
+                        className="text-sm font-medium text-slate-900 hover:text-emerald-700 cursor-pointer transition"
+                      >
+                        {order.bundle?.name || 'Unknown'}
+                      </p>
                       
                       {order.custom_items && order.custom_items.length > 0 && (
                         <div className="mt-1.5 flex flex-wrap gap-1">
@@ -579,18 +613,20 @@ export default function AdminOrders() {
                       {Number(order.total_amount) === 0 && order.notes?.includes('[SEMESTER SUBSCRIPTION') ? (
                         <span className="text-xs font-bold text-purple-700 bg-purple-100 px-2 py-1 rounded-md uppercase tracking-wide">Pre-paid</span>
                       ) : (
-                        <p className="text-sm font-medium text-slate-900">GH₵ {Number(order.total_amount).toFixed(2)}</p>
+                        <p className="text-sm font-semibold text-slate-900">
+                          GH₵ {Number(order.total_amount).toFixed(2)}
+                        </p>
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusColor(order.status)}`}>
-                        {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                      <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${getStatusBgColor(order.status)}`}>
+                        {order.status.charAt(0).toUpperCase() + order.status.slice(1).replace('_', ' ')}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
                         order.source === 'guest'
-                          ? 'bg-amber-100 text-amber-800'
+                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-blue-100 text-blue-800'
                       }`}>
                         {order.source === 'guest' ? 'Guest' : 'Registered'}
@@ -607,19 +643,60 @@ export default function AdminOrders() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <select
-                        value={order.status}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value, order.source, order.pickup_pin)}
-                        className={`text-sm px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent cursor-pointer font-medium ${getStatusBgColor(order.status)}`}
-                      >
-                        <option value="pending" className="bg-white text-slate-900">Pending</option>
-                        <option value="confirmed" className="bg-white text-slate-900">Confirmed</option>
-                        <option value="preparing" className="bg-white text-slate-900">Preparing</option>
-                        <option value="ready" className="bg-white text-slate-900">Ready</option>
-                        <option value="out_for_delivery" className="bg-white text-slate-900">Out for Delivery</option>
-                        <option value="delivered" className="bg-white text-slate-900">Delivered</option>
-                        <option value="cancelled" className="bg-white text-slate-900">Cancelled</option>
-                      </select>
+                      {isSupport ? (
+                        <button
+                          onClick={() => navigate(`/admin/orders/${order.id}`)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 text-sky-700 hover:bg-sky-100 font-semibold text-xs border border-sky-200 transition"
+                        >
+                          <Eye size={14} />
+                          <span>View Details</span>
+                        </button>
+                      ) : isPacker ? (
+                        <div className="flex items-center gap-2">
+                          {['confirmed', 'preparing'].includes(order.status) && (
+                            <select
+                              value={order.status}
+                              onChange={(e) => handleStatusChange(order.id, e.target.value, order.source, order.pickup_pin)}
+                              className={`text-xs px-2.5 py-1.5 rounded-lg border border-teal-200 focus:outline-none focus:ring-2 focus:ring-teal-500 cursor-pointer font-medium ${getStatusBgColor(order.status)}`}
+                            >
+                              <option value="confirmed" className="bg-white text-slate-900">Confirmed</option>
+                              <option value="preparing" className="bg-white text-slate-900">Preparing</option>
+                              <option value="ready" className="bg-white text-slate-900">Ready</option>
+                            </select>
+                          )}
+                          <button
+                            onClick={() => navigate(`/admin/orders/${order.id}`)}
+                            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200 text-xs font-semibold transition"
+                            title="Open Kitchen Packing Checklist"
+                          >
+                            <Eye size={14} />
+                            <span>Checklist</span>
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={order.status}
+                            onChange={(e) => handleStatusChange(order.id, e.target.value, order.source, order.pickup_pin)}
+                            className={`text-sm px-3 py-1.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent cursor-pointer font-medium ${getStatusBgColor(order.status)}`}
+                          >
+                            <option value="pending" className="bg-white text-slate-900">Pending</option>
+                            <option value="confirmed" className="bg-white text-slate-900">Confirmed</option>
+                            <option value="preparing" className="bg-white text-slate-900">Preparing</option>
+                            <option value="ready" className="bg-white text-slate-900">Ready</option>
+                            <option value="out_for_delivery" className="bg-white text-slate-900">Out for Delivery</option>
+                            <option value="delivered" className="bg-white text-slate-900">Delivered</option>
+                            <option value="cancelled" className="bg-white text-slate-900">Cancelled</option>
+                          </select>
+                          <button
+                            onClick={() => navigate(`/admin/orders/${order.id}`)}
+                            className="p-2 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition"
+                            title="View Order Details"
+                          >
+                            <Eye size={15} />
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -643,7 +720,6 @@ export default function AdminOrders() {
                 </button>
                 <div className="flex items-center gap-1">
                   {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
-                    // Only show 5 page numbers (current, +/- 2), or ellipsis if too many
                     if (
                       page === 1 ||
                       page === totalPages ||
@@ -685,8 +761,8 @@ export default function AdminOrders() {
       )}
 
       {/* Floating Bulk Action Bar */}
-      {selectedOrders.length > 0 && (
-        <div className="fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-lg border border-white/60 rounded-2xl shadow-xl p-6 animate-slideUp">
+      {!isSupport && selectedOrders.length > 0 && (
+        <div className="fixed bottom-6 left-6 right-6 bg-white/80 backdrop-blur-lg border border-white/60 rounded-2xl shadow-xl p-6 animate-slideUp z-30">
           <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-2">
               <span className="font-semibold text-slate-900">
@@ -694,26 +770,28 @@ export default function AdminOrders() {
               </span>
             </div>
             <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => updateBulkStatus('confirmed')}
-                disabled={bulkUpdating}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
-              >
-                {bulkUpdating ? 'Updating...' : 'Confirm'}
-              </button>
+              {!isPacker && (
+                <button
+                  onClick={() => updateBulkStatus('confirmed')}
+                  disabled={bulkUpdating}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+                >
+                  {bulkUpdating ? 'Updating...' : 'Confirm'}
+                </button>
+              )}
               <button
                 onClick={() => updateBulkStatus('preparing')}
                 disabled={bulkUpdating}
                 className="px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {bulkUpdating ? 'Updating...' : 'Preparing'}
+                {bulkUpdating ? 'Updating...' : 'Mark Preparing'}
               </button>
               <button
                 onClick={() => updateBulkStatus('ready')}
                 disabled={bulkUpdating}
                 className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
               >
-                {bulkUpdating ? 'Updating...' : 'Ready'}
+                {bulkUpdating ? 'Updating...' : 'Mark Ready'}
               </button>
               <button
                 onClick={() => setSelectedOrders([])}

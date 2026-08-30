@@ -2,8 +2,27 @@ import { useState, useEffect } from 'react';
 import { supabase, Bundle } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '../lib/navigation';
-import { ArrowLeft, Calendar, MapPin, Gift, Phone } from 'lucide-react';
+import { 
+  ArrowLeft, 
+  Calendar, 
+  Phone, 
+  Sun, 
+  Moon, 
+  Sunrise, 
+  ShieldCheck, 
+  Lock, 
+  Minus, 
+  Plus, 
+  CheckCircle2, 
+  ShoppingBag, 
+  CreditCard, 
+  Tag, 
+  Coins, 
+  PackageCheck,
+  Truck
+} from 'lucide-react';
 import { Link } from '../lib/navigation';
+import LocationZoneSelector, { DeliveryZone } from '../components/checkout/LocationZoneSelector';
 
 export default function Checkout() {
   const [bundle, setBundle] = useState<Bundle | null>(null);
@@ -25,7 +44,7 @@ export default function Checkout() {
   const [pointsToUse, setPointsToUse] = useState(0);
   const [pointsDiscount, setPointsDiscount] = useState(0);
   const [isSubscription, setIsSubscription] = useState(false);
-  const [deliveryFee, setDeliveryFee] = useState(15);
+  const [deliveryFee, setDeliveryFee] = useState(10);
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(700);
   const [subFoodDiscountPercent, setSubFoodDiscountPercent] = useState(40);
   const [subDeliveryDiscountPercent, setSubDeliveryDiscountPercent] = useState(20);
@@ -34,6 +53,14 @@ export default function Checkout() {
   const [loyaltyRedemptionRatio, setLoyaltyRedemptionRatio] = useState(100);
   const [loyaltyMinPointsToRedeem, setLoyaltyMinPointsToRedeem] = useState(500);
   const [customItems, setCustomItems] = useState<string[]>([]);
+  
+  // Delivery Zones 2-Tier State
+  const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
+  const [selectedHub, setSelectedHub] = useState<string>('');
+  const [selectedZoneId, setSelectedZoneId] = useState<string>('');
+  const [roomOrLandmark, setRoomOrLandmark] = useState<string>('');
+  const [isCustomAddress, setIsCustomAddress] = useState<boolean>(false);
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -61,6 +88,7 @@ export default function Checkout() {
     
     if (bundleId) {
       loadBundle(bundleId);
+      loadDeliveryZones();
       if (reorder === 'true') {
         loadLastOrderAddress();
       }
@@ -112,6 +140,48 @@ export default function Checkout() {
     }
   };
 
+  const loadDeliveryZones = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('delivery_zones')
+        .select('*')
+        .eq('is_active', true)
+        .order('hub_name', { ascending: true })
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setDeliveryZones(data);
+        const firstHub = data[0].hub_name;
+        setSelectedHub(firstHub);
+        const firstZone = data.find(z => z.hub_name === firstHub);
+        if (firstZone) {
+          setSelectedZoneId(firstZone.id);
+          setDeliveryFee(Number(firstZone.delivery_fee));
+        }
+      }
+    } catch (err) {
+      console.error('Error loading delivery zones:', err);
+    }
+  };
+
+  const handleHubSelect = (hub: string) => {
+    setSelectedHub(hub);
+    const matching = deliveryZones.filter(z => z.hub_name === hub);
+    if (matching.length > 0) {
+      setSelectedZoneId(matching[0].id);
+      setDeliveryFee(Number(matching[0].delivery_fee));
+    }
+  };
+
+  const handleZoneSelect = (zoneId: string) => {
+    setSelectedZoneId(zoneId);
+    const found = deliveryZones.find(z => z.id === zoneId);
+    if (found) {
+      setDeliveryFee(Number(found.delivery_fee));
+    }
+  };
+
   const loadSettings = async () => {
     try {
       const { data, error } = await supabase
@@ -120,7 +190,10 @@ export default function Checkout() {
         .eq('id', 1)
         .single();
       if (!error && data) {
-        setDeliveryFee(Number(data.delivery_charge));
+        // Fallback standard fee if no zone selected
+        if (!selectedZoneId && data.delivery_charge) {
+          setDeliveryFee(Number(data.delivery_charge));
+        }
         setFreeDeliveryThreshold(Number(data.free_delivery_threshold || 700));
         setSubFoodDiscountPercent(Number(data.subscription_food_discount_percent || 40));
         setSubDeliveryDiscountPercent(Number(data.subscription_delivery_discount_percent || 20));
@@ -276,6 +349,19 @@ export default function Checkout() {
     setSubmitting(true);
 
     try {
+      const activeZone = deliveryZones.find(z => z.id === selectedZoneId);
+      const computedAddress = isCustomAddress 
+        ? deliveryAddress 
+        : activeZone 
+          ? `[${activeZone.hub_name} - ${activeZone.zone_name}] ${roomOrLandmark}`.trim()
+          : (deliveryAddress || roomOrLandmark);
+
+      if (!computedAddress || (!isCustomAddress && !roomOrLandmark.trim())) {
+        setError('Please specify your hostel room number, floor, or delivery location details.');
+        setSubmitting(false);
+        return;
+      }
+
       const deliveryCount = isSubscription ? 3 : 1;
       const baseDeliveryCost = deliveryFee * deliveryCount;
       const subtotal = Number(bundle.price) * quantity * (isSubscription ? 3 : 1);
@@ -297,7 +383,7 @@ export default function Checkout() {
         p_bundle_id: bundle.id,
         p_quantity: quantity,
         p_is_subscription: isSubscription,
-        p_delivery_address: deliveryAddress,
+        p_delivery_address: computedAddress,
         p_delivery_time: deliveryTime || null,
         p_delivery_date: deliveryDate || null,
         p_notes: isSubscription ? `[SEMESTER SUBSCRIPTION: Delivery 1 of 3] ${notes}`.trim() : (notes || null),
@@ -346,308 +432,493 @@ export default function Checkout() {
   const totalAmount = Math.max(0, subtotal + finalDeliveryCost - totalDiscount);
 
   return (
-    <div className="max-w-4xl mx-auto pb-12">
-      <Link
-        to="/"
-        className="inline-flex items-center text-blue-400 hover:text-blue-300 mb-6 transition"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Bundles
-      </Link>
+    <div className="max-w-6xl mx-auto pb-16 px-4 sm:px-6">
+      {/* Top Breadcrumb & Progress Stepper */}
+      <div className="mb-8">
+        <Link
+          to="/"
+          className="inline-flex items-center text-xs font-semibold text-gray-400 hover:text-white mb-4 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+          Back to Packages
+        </Link>
 
-      <h1 className="text-3xl font-bold text-white mb-8">Checkout</h1>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl shadow-sm p-6">
-          <h2 className="text-xl font-bold text-white mb-4">Order Details</h2>
-
-          <div className="mb-6 pb-6 border-b border-white/10">
-            <h3 className="font-semibold text-white mb-2">{bundle.name}</h3>
-            <p className="text-gray-400 text-sm mb-3">{bundle.description}</p>
-            <p className="text-2xl font-bold text-emerald-400">
-              GH₵ {Number(bundle.price).toFixed(2)}
-            </p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="bg-emerald-500/20 text-emerald-300 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-emerald-500/30">
+                🔒 Secure Student Checkout
+              </span>
+              {isSubscription && (
+                <span className="bg-purple-500/20 text-purple-300 text-xs font-extrabold px-2.5 py-0.5 rounded-full border border-purple-500/30">
+                  Semester Plan
+                </span>
+              )}
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Complete Your Order</h1>
+            <p className="text-xs sm:text-sm text-gray-400 mt-1">Direct hostel doorstep drop with verified 4-digit pickup PIN</p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          {/* Stepper Indicator */}
+          <div className="flex items-center gap-2 text-xs font-semibold bg-slate-900/60 p-2 rounded-xl border border-white/10">
+            <div className="flex items-center gap-1.5 text-emerald-400">
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Package</span>
+            </div>
+            <span className="text-gray-600">/</span>
+            <div className="flex items-center gap-1.5 text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-lg border border-blue-500/20">
+              <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
+              <span>Details</span>
+            </div>
+            <span className="text-gray-600">/</span>
+            <div className="flex items-center gap-1.5 text-gray-400">
+              <CreditCard className="w-3.5 h-3.5" />
+              <span>Payment</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Form & Details */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* Bundle Preview Card */}
+          <div className="bg-gradient-to-br from-slate-900/90 to-slate-800/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-start gap-4">
+              {bundle.image_url ? (
+                <img 
+                  src={bundle.image_url} 
+                  alt={bundle.name} 
+                  className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl object-cover border border-white/10 shrink-0 shadow-md"
+                />
+              ) : (
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-xl bg-gradient-to-br from-blue-600/30 to-emerald-600/30 border border-white/10 flex items-center justify-center shrink-0 shadow-md">
+                  <ShoppingBag className="w-8 h-8 text-emerald-400" />
+                </div>
+              )}
+
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <h3 className="text-lg font-bold text-white truncate">{bundle.name}</h3>
+                  <span className="text-lg sm:text-xl font-extrabold text-emerald-400 shrink-0">
+                    GH₵ {Number(bundle.price).toFixed(2)}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 line-clamp-2 mb-3">{bundle.description}</p>
+
+                {/* Quantity Stepper & Price Multiplier */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/10">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-semibold text-gray-300">Quantity:</span>
+                    <div className="flex items-center bg-slate-800 border border-white/20 rounded-xl overflow-hidden p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                        className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition disabled:opacity-30"
+                      >
+                        <Minus className="w-3.5 h-3.5" />
+                      </button>
+                      <span className="w-8 text-center text-xs font-bold text-white">
+                        {quantity}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setQuantity(Math.min(10, quantity + 1))}
+                        disabled={quantity >= 10}
+                        className="w-7 h-7 flex items-center justify-center text-gray-300 hover:text-white hover:bg-white/10 rounded-lg transition disabled:opacity-30"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-[11px] text-gray-400 block">Subtotal</span>
+                    <span className="text-sm font-bold text-white">
+                      GH₵ {subtotal.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Checkout Details Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-lg text-sm">
+              <div className="p-4 bg-red-500/15 border border-red-500/40 text-red-200 rounded-xl text-sm font-medium animate-in fade-in">
                 {error}
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Quantity
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="10"
-                value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                required
-              />
-            </div>
+            {/* 1. Location & Campus Selector */}
+            <LocationZoneSelector
+              deliveryZones={deliveryZones}
+              selectedHub={selectedHub}
+              selectedZoneId={selectedZoneId}
+              roomOrLandmark={roomOrLandmark}
+              isCustomAddress={isCustomAddress}
+              deliveryAddress={deliveryAddress}
+              onSelectHub={handleHubSelect}
+              onSelectZone={handleZoneSelect}
+              onChangeRoom={setRoomOrLandmark}
+              onChangeCustomAddress={setDeliveryAddress}
+              onToggleCustom={() => setIsCustomAddress(!isCustomAddress)}
+            />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                <MapPin className="w-4 h-4 mr-1 text-emerald-400" />
-                Delivery Address
-              </label>
-              <textarea
-                value={deliveryAddress}
-                onChange={(e) => setDeliveryAddress(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500"
-                rows={3}
-                placeholder="Enter your delivery address on campus"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                <Phone className="w-4 h-4 mr-1 text-emerald-400" />
-                Delivery Phone Number
-              </label>
-              <input
-                type="tel"
-                value={deliveryPhone}
-                onChange={(e) => setDeliveryPhone(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500"
-                placeholder="0244123456"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                <Calendar className="w-4 h-4 mr-1 text-blue-400" />
-                Preferred Delivery Date
-              </label>
-              <input
-                type="date"
-                value={deliveryDate}
-                onChange={(e) => setDeliveryDate(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Preferred Time
-              </label>
-              <select
-                value={deliveryTime}
-                onChange={(e) => setDeliveryTime(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none [&>option]:bg-slate-800"
-              >
-                <option value="">Select time</option>
-                <option value="Morning (8am-12pm)">Morning (8am-12pm)</option>
-                <option value="Afternoon (12pm-4pm)">Afternoon (12pm-4pm)</option>
-                <option value="Evening (4pm-8pm)">Evening (4pm-8pm)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Special Notes (Optional)
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500"
-                rows={2}
-                placeholder="Any special instructions?"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Promo Code (Optional)
-              </label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value)}
-                  className="flex-1 px-4 py-3 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500"
-                  placeholder="Enter promo code"
-                />
-                <button
-                  type="button"
-                  onClick={applyPromoCode}
-                  className="bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-3 rounded-lg transition border border-white/10"
-                >
-                  Apply
-                </button>
+            {/* 2. Recipient Contact & Schedule */}
+            <div className="bg-slate-900/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-white/10">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
+                  <Phone className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-wide">Contact & Delivery Time</h3>
+                  <p className="text-[11px] text-gray-400">Driver will call before arrival</p>
+                </div>
               </div>
-              {promoError && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-3 py-2 rounded-lg text-sm">
-                  {promoError}
+
+              <div>
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                  Recipient Active Mobile Phone Number
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="tel"
+                    value={deliveryPhone}
+                    onChange={(e) => setDeliveryPhone(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-800/90 border border-white/15 text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500 font-semibold text-sm"
+                    placeholder="e.g. 0244 123 456"
+                    required
+                  />
                 </div>
-              )}
-              {promoSuccess && (
-                <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-2 rounded-lg text-sm">
-                  {promoSuccess}
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                  Preferred Delivery Date
+                </label>
+                <div className="relative">
+                  <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="date"
+                    value={deliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-slate-800/90 border border-white/15 text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm font-medium"
+                  />
                 </div>
-              )}
+              </div>
+
+              {/* Time Window Selector */}
+              <div>
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                  <span>Preferred Time Window</span>
+                  <span className="text-[10px] text-gray-400 font-normal">Optional</span>
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {[
+                    { value: 'Morning (8am-12pm)', label: 'Morning', time: '8:00 AM – 12:00 PM', icon: Sunrise, color: 'text-amber-400' },
+                    { value: 'Afternoon (12pm-4pm)', label: 'Afternoon', time: '12:00 PM – 4:00 PM', icon: Sun, color: 'text-orange-400' },
+                    { value: 'Evening (4pm-8pm)', label: 'Evening', time: '4:00 PM – 8:00 PM', icon: Moon, color: 'text-indigo-400' },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const isSelected = deliveryTime === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setDeliveryTime(isSelected ? '' : item.value)}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          isSelected 
+                            ? 'bg-blue-600/20 border-blue-500 ring-2 ring-blue-500/30 text-white shadow-md' 
+                            : 'bg-slate-800/40 border-white/10 hover:border-white/20 text-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 mb-1">
+                          <Icon className={`w-3.5 h-3.5 ${item.color}`} />
+                          <span className="text-xs font-bold text-white">{item.label}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-400">{item.time}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                  Special Delivery Instructions (Optional)
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="w-full px-4 py-3 bg-slate-800/90 border border-white/15 text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500 text-sm"
+                  rows={2}
+                  placeholder="e.g. Call upon reaching hostel gate, drop with porter if in lecture..."
+                />
+              </div>
             </div>
 
-            {loyaltyPoints > 0 && (
+            {/* 3. Promo Code & Loyalty Points */}
+            <div className="bg-slate-900/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center gap-2 pb-3 border-b border-white/10">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center border border-purple-500/30">
+                  <Tag className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white tracking-wide">Discounts & Rewards</h3>
+                  <p className="text-[11px] text-gray-400">Apply voucher coupon or redeem student loyalty points</p>
+                </div>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
-                  <Gift className="w-4 h-4 mr-1 text-purple-400" />
-                  Loyalty Points
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                  Promo / Voucher Code
                 </label>
-                <div className="bg-purple-500/5 border border-purple-500/20 rounded-lg p-4 mb-3">
-                  <p className="text-sm text-gray-400 mb-3">
-                    You have <span className="font-bold text-purple-400">{loyaltyPoints} points</span>
-                    <span className="text-gray-500 block text-xs mt-1">({loyaltyRedemptionRatio} points = GH₵ 1 discount. Minimum {loyaltyMinPointsToRedeem} points to redeem)</span>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value)}
+                    className="flex-1 px-4 py-2.5 bg-slate-800/90 border border-white/15 text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none placeholder-gray-500 text-sm uppercase font-mono tracking-wider"
+                    placeholder="DISCOUNT10"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyPromoCode}
+                    className="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition border border-white/15 shrink-0"
+                  >
+                    Apply Code
+                  </button>
+                </div>
+                {promoError && (
+                  <p className="mt-2 text-xs font-semibold text-red-400">{promoError}</p>
+                )}
+                {promoSuccess && (
+                  <p className="mt-2 text-xs font-semibold text-emerald-400 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> {promoSuccess}
                   </p>
-                  <div className="flex items-center gap-3">
+                )}
+              </div>
+
+              {loyaltyPoints > 0 && (
+                <div className="bg-purple-950/40 border border-purple-500/30 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Coins className="w-4 h-4 text-purple-400" />
+                      <span className="text-xs font-bold text-white">Student Loyalty Points</span>
+                    </div>
+                    <span className="text-xs font-extrabold bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-md border border-purple-500/30">
+                      {loyaltyPoints} pts available
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-400">
+                    {loyaltyRedemptionRatio} points = GH₵ 1.00 instant discount. (Min {loyaltyMinPointsToRedeem} points).
+                  </p>
+                  <label className="flex items-center gap-2.5 cursor-pointer pt-1">
                     <input
                       type="checkbox"
                       id="usePoints"
                       checked={usePoints}
                       onChange={applyLoyaltyPoints}
                       disabled={loyaltyPoints < loyaltyMinPointsToRedeem}
-                      className="w-4 h-4 text-purple-500 rounded border-gray-600 bg-slate-800 focus:ring-purple-500 focus:ring-offset-slate-900 disabled:opacity-50"
+                      className="w-4 h-4 text-purple-500 rounded border-gray-600 bg-slate-800 focus:ring-purple-500"
                     />
-                    <label htmlFor="usePoints" className={`text-sm flex-1 ${loyaltyPoints < loyaltyMinPointsToRedeem ? 'text-gray-500' : 'text-gray-300'}`}>
-                      Redeem loyalty points for discount {loyaltyPoints < loyaltyMinPointsToRedeem && `(Need ${loyaltyMinPointsToRedeem}+)`}
-                    </label>
-                  </div>
+                    <span className="text-xs text-gray-300 font-medium">
+                      Redeem points on this purchase
+                    </span>
+                  </label>
                   {usePoints && (
-                    <div className="mt-3 pt-3 border-t border-purple-500/20">
-                      <label className="text-xs font-medium text-gray-400 block mb-2">
-                        Points to redeem (up to {loyaltyPoints})
-                      </label>
-                      <input
-                        type="number"
-                        value={pointsToUse}
-                        onChange={(e) => updatePointsAmount(parseInt(e.target.value) || 0)}
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-purple-500/30 text-white rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none text-sm"
-                        min="0"
-                        max={loyaltyPoints}
-                        step="10"
-                      />
-                      <p className="text-xs text-purple-400 mt-2 font-medium">
-                        Discount: -GH₵ {pointsDiscount.toFixed(2)}
-                      </p>
+                    <div className="pt-2 border-t border-purple-500/20 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          value={pointsToUse}
+                          onChange={(e) => updatePointsAmount(parseInt(e.target.value) || 0)}
+                          className="w-28 px-2.5 py-1.5 bg-slate-800 border border-purple-500/40 text-white rounded-lg text-xs font-bold focus:ring-1 focus:ring-purple-400 outline-none"
+                          min="0"
+                          max={loyaltyPoints}
+                          step="10"
+                        />
+                        <span className="text-[11px] text-gray-400">points applied</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs font-bold text-purple-300">
+                        <span>Points Discount:</span>
+                        <span>-GH₵ {pointsDiscount.toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            <button
-              type="submit"
-              disabled={submitting}
-              className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-bold py-4 px-4 rounded-xl transition transform hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
-              {submitting ? 'Processing...' : `Proceed to Payment - GH₵ ${totalAmount.toFixed(2)}`}
-            </button>
+            {/* Mobile Submit Button inside form for accessibility */}
+            <div className="lg:hidden">
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white font-extrabold py-4 px-6 rounded-2xl transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Lock className="w-4 h-4" />
+                {submitting ? 'Creating Order...' : `Proceed to Payment (GH₵ ${totalAmount.toFixed(2)})`}
+              </button>
+            </div>
           </form>
         </div>
 
-        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl p-6 h-fit">
-          <h3 className="text-lg font-bold text-white mb-4">Order Summary</h3>
-          {isSubscription && (
-            <div className="bg-purple-500/10 text-purple-400 px-4 py-3 rounded-lg text-sm mb-6 border border-purple-500/20">
-              <span className="font-semibold">Semester Subscription</span> (3 Deliveries)
+        {/* Right Column: Sticky Order Summary & Trust Guarantee */}
+        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-6">
+          {/* Summary Card */}
+          <div className="bg-slate-900/90 backdrop-blur-xl border border-white/15 rounded-2xl p-6 shadow-2xl space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
+                <ShoppingBag className="w-4 h-4 text-emerald-400" />
+                Order Summary
+              </h3>
+              <span className="text-xs text-gray-400 font-medium">{quantity} item(s)</span>
             </div>
-          )}
-          <div className="space-y-3 mb-6 text-sm md:text-base">
-            <div className="flex justify-between text-gray-300">
-              <span>Subtotal</span>
-              <span className="text-white font-medium">GH₵ {subtotal.toFixed(2)}</span>
+
+            {/* Price Breakdown Line Items */}
+            <div className="space-y-2.5 text-xs sm:text-sm">
+              <div className="flex justify-between text-gray-300">
+                <span>Bundle Subtotal</span>
+                <span className="text-white font-bold">GH₵ {subtotal.toFixed(2)}</span>
+              </div>
+
+              <div className="flex justify-between text-gray-300">
+                <span>Delivery Fee {isSubscription && '(Semester)'}</span>
+                <span className="font-semibold text-white">
+                  {isFreeDelivery ? (
+                    <span className="line-through text-gray-500 mr-1.5">GH₵ {baseDeliveryCost.toFixed(2)}</span>
+                  ) : null}
+                  GH₵ {finalDeliveryCost.toFixed(2)}
+                </span>
+              </div>
+
+              {freeDeliveryDiscount > 0 && (
+                <div className="flex justify-between text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
+                  <span className="flex items-center gap-1">🎉 Free Delivery Triggered!</span>
+                  <span>-GH₵ {freeDeliveryDiscount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {subDeliveryDiscount > 0 && (
+                <div className="flex justify-between text-emerald-400 font-medium">
+                  <span>Subscriber Delivery Saver</span>
+                  <span>-GH₵ {subDeliveryDiscount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {subscriptionDiscount > 0 && (
+                <div className="flex justify-between text-purple-400 font-medium">
+                  <span>Semester Food Discount ({subFoodDiscountPercent}%)</span>
+                  <span>-GH₵ {subscriptionDiscount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {promoDiscount > 0 && (
+                <div className="flex justify-between text-emerald-400 font-bold">
+                  <span>Coupon Promo Discount</span>
+                  <span>-GH₵ {promoDiscount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {pointsDiscount > 0 && (
+                <div className="flex justify-between text-purple-400 font-bold">
+                  <span>Loyalty Points Discount</span>
+                  <span>-GH₵ {pointsDiscount.toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Grand Total */}
+              <div className="border-t border-white/10 pt-4 mt-3 flex items-center justify-between">
+                <div>
+                  <span className="text-sm font-extrabold text-white block">Grand Total</span>
+                  <span className="text-[10px] text-gray-400">All taxes & campus fees included</span>
+                </div>
+                <span className="text-2xl font-black text-emerald-400 tracking-tight">
+                  GH₵ {totalAmount.toFixed(2)}
+                </span>
+              </div>
             </div>
-            <div className="flex justify-between text-gray-300">
-              <span>Quantity</span>
-              <span className="text-white font-medium">×{quantity} {isSubscription ? '(×3 Months)' : ''}</span>
-            </div>
-            <div className="flex justify-between text-gray-300 pt-2 border-t border-white/5 mt-2">
-              <span>Delivery Fee {isSubscription && '(×3 Deliveries)'}</span>
-              <span className="text-white font-medium">
-                {isFreeDelivery ? <span className="line-through text-gray-500 mr-2">GH₵ {baseDeliveryCost.toFixed(2)}</span> : null}
-                GH₵ {finalDeliveryCost.toFixed(2)}
-              </span>
-            </div>
-            {freeDeliveryDiscount > 0 && (
-              <div className="flex justify-between text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-md mt-1">
-                <span>🎉 Free Delivery Applied!</span>
-                <span>-GH₵ {freeDeliveryDiscount.toFixed(2)}</span>
-              </div>
-            )}
-            {subDeliveryDiscount > 0 && (
-              <div className="flex justify-between text-emerald-400 font-semibold mt-1">
-                <span>Subscriber Delivery Discount ({subDeliveryDiscountPercent}%)</span>
-                <span>-GH₵ {subDeliveryDiscount.toFixed(2)}</span>
-              </div>
-            )}
-            {subscriptionDiscount > 0 && (
-              <div className="flex justify-between text-purple-400 font-semibold pt-2 border-t border-white/5 mt-2">
-                <span>Semester Food Discount ({subFoodDiscountPercent}%)</span>
-                <span>-GH₵ {subscriptionDiscount.toFixed(2)}</span>
-              </div>
-            )}
-            {promoDiscount > 0 && (
-              <div className="flex justify-between text-emerald-400 font-semibold">
-                <span>Promo Discount</span>
-                <span>-GH₵ {promoDiscount.toFixed(2)}</span>
-              </div>
-            )}
-            {pointsDiscount > 0 && (
-              <div className="flex justify-between text-blue-400 font-semibold">
-                <span>Points Discount</span>
-                <span>-GH₵ {pointsDiscount.toFixed(2)}</span>
-              </div>
-            )}
-            <div className="border-t border-white/10 pt-4 mt-2 flex justify-between items-center text-lg md:text-xl font-bold text-white">
-              <span>Total Amount</span>
-              <span className="text-emerald-400">GH₵ {totalAmount.toFixed(2)}</span>
+
+            {/* Desktop Proceed Button */}
+            <button
+              type="button"
+              onClick={handleSubmit}
+              disabled={submitting}
+              className="w-full bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-600 hover:from-emerald-600 hover:to-blue-700 text-white font-extrabold py-4 px-6 rounded-xl transition-all shadow-xl shadow-emerald-500/20 flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.99]"
+            >
+              <Lock className="w-4 h-4" />
+              {submitting ? 'Creating Order...' : `Proceed to Payment • GH₵ ${totalAmount.toFixed(2)}`}
+            </button>
+
+            {/* Included Items Details */}
+            <div className="pt-4 border-t border-white/10">
+              <p className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                <PackageCheck className="w-3.5 h-3.5 text-blue-400" />
+                Bundle Meal Items {customItems.length > 0 ? '(Customized)' : ''}:
+              </p>
+              
+              {customItems.length > 0 ? (
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+                  {(bundle.items || []).filter(item => customItems.includes(item)).map((item, idx) => (
+                    <span key={`kept-${idx}`} className="text-[11px] font-medium bg-slate-800 text-gray-300 px-2 py-1 rounded-md border border-white/10">
+                      {item}
+                    </span>
+                  ))}
+                  {customItems.filter(item => !(bundle.items || []).includes(item)).map((item, idx) => (
+                    <span key={`added-${idx}`} className="text-[11px] font-bold bg-emerald-500/15 text-emerald-300 px-2 py-1 rounded-md border border-emerald-500/30">
+                      + {item}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-1">
+                  {bundle.items?.map((item, idx) => (
+                    <span key={idx} className="text-[11px] font-medium bg-slate-800 text-gray-300 px-2 py-1 rounded-md border border-white/10">
+                      • {item}
+                    </span>
+                  )) || <span className="text-xs text-gray-500">Standard pack contents</span>}
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-sm text-gray-400">
-            <p className="font-semibold text-white mb-3">
-              What's included {customItems.length > 0 ? '(Customized)' : ''}:
-            </p>
-            {customItems.length > 0 ? (
-              <div className="space-y-3">
-                <ul className="space-y-2">
-                  {(bundle.items || []).filter(item => customItems.includes(item)).map((item, index) => (
-                    <li key={`kept-${index}`} className="flex items-center text-gray-300">
-                      <span className="w-1.5 h-1.5 bg-gray-400 rounded-full mr-2"></span>
-                      {item}
-                    </li>
-                  ))}
-                  {customItems.filter(item => !(bundle.items || []).includes(item)).map((item, index) => (
-                    <li key={`added-${index}`} className="flex items-center text-emerald-400">
-                      <span className="text-emerald-400 font-bold mr-2">+</span>
-                      {item} <span className="ml-2 text-xs bg-emerald-500/10 px-1.5 py-0.5 rounded text-emerald-400">Added</span>
-                    </li>
-                  ))}
-                  {(bundle.items || []).filter(item => !customItems.includes(item)).map((item, index) => (
-                    <li key={`removed-${index}`} className="flex items-center text-gray-500 line-through">
-                      <span className="text-red-400 font-bold mr-2 no-underline">-</span>
-                      {item} <span className="ml-2 text-xs bg-red-500/10 px-1.5 py-0.5 rounded text-red-400 no-underline">Removed</span>
-                    </li>
-                  ))}
-                </ul>
+          {/* Trust, Payment Methods & Security Guarantee Card */}
+          <div className="bg-slate-900/60 backdrop-blur-md border border-white/10 rounded-2xl p-5 space-y-4">
+            <div>
+              <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block mb-2">
+                Supported Fast Payment Channels
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-[10px] font-bold text-white">
+                <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300">
+                  MTN MoMo
+                </div>
+                <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300">
+                  Telecel Cash
+                </div>
+                <div className="p-2 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300">
+                  AT Money
+                </div>
+                <div className="p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-300">
+                  Debit Card
+                </div>
               </div>
-            ) : (
-              <ul className="space-y-2">
-                {bundle.items?.map((item, index) => (
-                  <li key={index} className="flex items-center">
-                    <span className="w-1.5 h-1.5 bg-blue-400 rounded-full mr-2"></span>
-                    {item}
-                  </li>
-                )) || <li>Meal items as described</li>}
-              </ul>
-            )}
+            </div>
+
+            <div className="space-y-2 pt-2 border-t border-white/10 text-xs text-gray-400">
+              <div className="flex items-center gap-2 text-gray-300">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>256-Bit SSL Encrypted & Verified by Paystack / Hubtel</span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <Truck className="w-4 h-4 text-blue-400 shrink-0" />
+                <span>Real-Time Driver Tracking & 4-Digit Pickup PIN Security</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

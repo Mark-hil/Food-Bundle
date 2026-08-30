@@ -21,7 +21,16 @@ export default function AdminLogin() {
       if (result.error) {
         setError(result.error.message);
       } else {
-        navigate('/admin/dashboard');
+        const role = result.role;
+        if (role === 'admin' || role === 'super_admin') {
+          navigate('/admin/dashboard');
+        } else if (role === 'support' || role === 'packer') {
+          navigate('/admin/orders');
+        } else if (role === 'driver') {
+          navigate('/driver/dashboard');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (err: any) {
       setError(err.message || 'Failed to sign in');

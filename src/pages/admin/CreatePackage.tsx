@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
-import { ArrowLeft, Plus } from 'lucide-react';
+import { ArrowLeft, Plus, Lock, Rocket } from 'lucide-react';
 import ImageUpload from '../../components/ImageUpload';
 
 export default function CreatePackage() {
@@ -13,6 +13,7 @@ export default function CreatePackage() {
     duration_days: '',
     items_per_week: '',
     image_url: '',
+    available: false, // Default to Draft for best practice safety
   });
   const [isCustomizable, setIsCustomizable] = useState(false);
   const [customOptions, setCustomOptions] = useState<{category: string, options: string[], required: boolean, maxSelections: number}[]>([]);
@@ -72,8 +73,7 @@ export default function CreatePackage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSaveWithPublishState = async (publishLive: boolean) => {
     setError('');
     setLoading(true);
 
@@ -81,12 +81,13 @@ export default function CreatePackage() {
       const { error: insertError } = await supabase
         .from('bundles')
         .insert([{
-          name: formData.name,
-          description: formData.description,
+          name: formData.name.trim(),
+          description: formData.description.trim(),
           price: parseInt(formData.price) * 100,
           duration_days: parseInt(formData.duration_days) || 0,
           items_per_week: parseInt(formData.items_per_week) || 0,
           image_url: formData.image_url,
+          available: publishLive,
           is_customizable: isCustomizable,
           customization_options: isCustomizable ? customOptions.map(opt => ({
             ...opt,
@@ -126,7 +127,13 @@ export default function CreatePackage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSaveWithPublishState(formData.available);
+            }} 
+            className="space-y-6"
+          >
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Package Name
@@ -138,7 +145,21 @@ export default function CreatePackage() {
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                placeholder="e.g., Basic Meal Plan"
+                placeholder="e.g. ALPHA, BETA, PREMIUM PACK"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Description
+              </label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows={3}
+                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                placeholder="Describe what's in this package and its benefits"
               />
             </div>
 
@@ -152,55 +173,40 @@ export default function CreatePackage() {
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Description
+                Price (GH₵)
               </label>
-              <textarea
-                name="description"
-                value={formData.description}
+              <input
+                type="number"
+                name="price"
+                value={formData.price}
                 onChange={handleChange}
                 required
-                rows={4}
+                min="0"
+                step="0.01"
                 className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                placeholder="Describe the package..."
+                placeholder="0.00"
               />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Price (GH₵)
-                </label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  required
-                  step="0.01"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Duration (Days)
-                </label>
-                <input
-                  type="number"
-                  name="duration_days"
-                  value={formData.duration_days}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                  placeholder="30"
-                />
-              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Items Per Week
+                Duration (Days)
+              </label>
+              <input
+                type="number"
+                name="duration_days"
+                value={formData.duration_days}
+                onChange={handleChange}
+                required
+                min="1"
+                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                placeholder="30"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Items per Week
               </label>
               <input
                 type="number"
@@ -211,6 +217,58 @@ export default function CreatePackage() {
                 className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
                 placeholder="5"
               />
+            </div>
+
+            {/* Publishing & Visibility Status Selector */}
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+              <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Publishing & Visibility Status
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div
+                  onClick={() => setFormData(prev => ({ ...prev, available: false }))}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
+                    !formData.available 
+                      ? 'border-slate-800 bg-slate-900 text-white shadow-sm' 
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg mt-0.5 ${!formData.available ? 'bg-slate-800 text-amber-300' : 'bg-slate-100 text-slate-500'}`}>
+                    <Lock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs">Save as Draft</span>
+                      {!formData.available && <span className="bg-amber-400/20 text-amber-300 text-[10px] px-1.5 py-0.2 rounded font-bold">Selected</span>}
+                    </div>
+                    <p className={`text-[11px] mt-0.5 leading-relaxed ${!formData.available ? 'text-slate-300' : 'text-slate-400'}`}>
+                      Hidden from students & guests. Perfect for preparing recipes before launching.
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  onClick={() => setFormData(prev => ({ ...prev, available: true }))}
+                  className={`p-3.5 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
+                    formData.available 
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm' 
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                  }`}
+                >
+                  <div className={`p-2 rounded-lg mt-0.5 ${formData.available ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <Rocket className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-xs">Publish Live</span>
+                      {formData.available && <span className="bg-emerald-600 text-white text-[10px] px-1.5 py-0.2 rounded font-bold">Live</span>}
+                    </div>
+                    <p className={`text-[11px] mt-0.5 leading-relaxed ${formData.available ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      Instantly visible on the student ordering menu and guest checkout catalog.
+                    </p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <div className="border-t border-slate-200 pt-6">
@@ -301,20 +359,33 @@ export default function CreatePackage() {
               )}
             </div>
 
-            <div className="flex gap-4 pt-4">
-              <button
-                type="submit"
-                disabled={loading}
-                className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-slate-400 text-white font-medium py-2 rounded-xl transition"
-              >
-                {loading ? 'Creating...' : 'Create Package'}
-              </button>
+            {/* Action Buttons: Cancel, Save Draft, Publish Live */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-slate-200">
               <button
                 type="button"
                 onClick={() => navigate('/admin/packages')}
-                className="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-900 font-medium py-2 rounded-xl transition"
+                disabled={loading}
+                className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 px-5 rounded-xl transition text-xs order-3 sm:order-1"
               >
                 Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveWithPublishState(false)}
+                disabled={loading}
+                className="flex-1 bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-5 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-sm order-2 active:scale-95"
+              >
+                <Lock className="w-4 h-4 text-amber-300" />
+                <span>Save as Draft (Hidden)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveWithPublishState(true)}
+                disabled={loading}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-5 rounded-xl transition text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-500/20 order-1 sm:order-3 active:scale-95"
+              >
+                <Rocket className="w-4 h-4" />
+                <span>Publish Live to Students</span>
               </button>
             </div>
           </form>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle, Clock, XCircle, Package, ArrowLeft, RefreshCw, MapPin, Calendar, Timer, Lock, CheckCircle2 } from 'lucide-react';
+import { CheckCircle, Clock, XCircle, Package, ArrowLeft, ArrowRight, RefreshCw, MapPin, Calendar, Timer, Lock, CheckCircle2 } from 'lucide-react';
 import { supabase, Order, Bundle } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate, useLocation } from '../../lib/navigation';
@@ -84,10 +84,11 @@ export default function TrackDelivery() {
 
   // Extract order ID from pathname
   const orderId = pathname.split('/').pop();
+  const [isGuest, setIsGuest] = useState(false);
 
   useEffect(() => {
-    if (!user || !orderId) {
-      setError('Invalid order ID or user not authenticated');
+    if (!orderId) {
+      setError('Invalid order ID');
       setLoading(false);
       return;
     }
@@ -97,34 +98,60 @@ export default function TrackDelivery() {
         setLoading(true);
         setError(null);
 
-        // Fetch order with bundle relation
-        const { data: orderData, error: orderError } = await supabase
+        // 1. Try to fetch from registered orders first
+        let { data: orderData } = await supabase
           .from('orders')
           .select('*, bundle:bundles(*)')
           .eq('id', orderId)
           .maybeSingle();
 
-        if (orderError) throw orderError;
+        let guestMode = false;
+
+        // 2. If not found in registered orders, check guest_orders
+        if (!orderData) {
+          const { data: guestData } = await supabase
+            .from('guest_orders')
+            .select('*, bundle:bundles(*)')
+            .eq('id', orderId)
+            .maybeSingle();
+
+          if (guestData) {
+            orderData = guestData;
+            guestMode = true;
+          }
+        }
 
         if (!orderData) {
-          setError('Order not found');
+          setError('Order not found. Please check your order reference link.');
           setOrder(null);
           setTimeline([]);
           return;
         }
 
+        setIsGuest(guestMode);
         setOrder(orderData);
 
-        // Fetch order timeline
-        const { data: timelineData, error: timelineError } = await supabase
+        // Fetch order timeline if available
+        const { data: timelineData } = await supabase
           .from('order_timeline')
           .select('*')
           .eq('order_id', orderId)
           .order('created_at', { ascending: true });
 
-        if (timelineError) throw timelineError;
-
-        setTimeline(timelineData || []);
+        // If timeline table has entries, use them; otherwise create default step from created_at
+        if (timelineData && timelineData.length > 0) {
+          setTimeline(timelineData);
+        } else {
+          setTimeline([
+            {
+              id: 'init',
+              order_id: orderId,
+              status: orderData.status,
+              created_at: orderData.created_at,
+              note: `Order ${orderData.status}`
+            }
+          ]);
+        }
       } catch (err) {
         console.error('Error fetching order:', err);
         setError('Failed to load order details');
@@ -134,14 +161,15 @@ export default function TrackDelivery() {
     };
 
     fetchOrderData();
-  }, [orderId, user]);
+  }, [orderId]);
 
   const confirmReceipt = async () => {
     if (!order) return;
     try {
       setLoading(true);
+      const targetTable = isGuest ? 'guest_orders' : 'orders';
       const { error } = await supabase
-        .from('orders')
+        .from(targetTable)
         .update({ status: 'delivered' })
         .eq('id', order.id);
 
@@ -205,11 +233,11 @@ export default function TrackDelivery() {
     return (
       <div className="space-y-8">
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate(user ? '/orders' : '/bundles')}
           className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-semibold mb-4 transition"
         >
           <ArrowLeft size={20} />
-          Back to Dashboard
+          {user ? 'Back to My Orders' : 'Back to Packages'}
         </button>
         <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-xl shadow-sm p-12 text-center">
           <Package size={48} className="mx-auto text-gray-500 mb-4" />
@@ -218,11 +246,65 @@ export default function TrackDelivery() {
             {error || "We couldn't find the order you're looking for."}
           </p>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(user ? '/orders' : '/bundles')}
             className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition"
           >
-            Go to Dashboard
+            {user ? 'Go to Orders' : 'Explore Packages'}
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // If user is a guest / not authenticated, prompt them to create an account or sign in to track
+  if (!user && order) {
+    const regUrl = `/register?redirect=${encodeURIComponent(`/track/${order.id}`)}&email=${encodeURIComponent((order as any).email || '')}&name=${encodeURIComponent((order as any).full_name || '')}&phone=${encodeURIComponent((order as any).phone || '')}`;
+    const loginUrl = `/login?redirect=${encodeURIComponent(`/track/${order.id}`)}`;
+
+    return (
+      <div className="max-w-xl mx-auto py-12 px-4 space-y-6">
+        <button
+          onClick={() => navigate('/bundles')}
+          className="flex items-center gap-2 text-slate-400 hover:text-white font-semibold transition text-sm"
+        >
+          <ArrowLeft size={18} />
+          Back to Packages
+        </button>
+
+        <div className="bg-slate-900/80 backdrop-blur-xl border border-slate-800 rounded-3xl p-8 shadow-2xl text-center relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div className="w-16 h-16 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-5 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+            <Lock size={32} />
+          </div>
+
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs font-mono mb-3">
+            <span>Order #{order.id.slice(0, 8).toUpperCase()} Found</span>
+          </div>
+
+          <h2 className="text-2xl sm:text-3xl font-black text-white mb-2">
+            Create Account to Track Order
+          </h2>
+          <p className="text-slate-300 text-sm max-w-md mx-auto mb-8 leading-relaxed">
+            To view live GPS driver updates, real-time arrival ETA, and your secure pickup PIN, please create your student account.
+          </p>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => navigate(regUrl)}
+              className="w-full py-4 px-6 rounded-xl font-bold text-white bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all flex items-center justify-center gap-2 group"
+            >
+              <span>Create Free Account</span>
+              <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+
+            <button
+              onClick={() => navigate(loginUrl)}
+              className="w-full py-3.5 px-6 rounded-xl font-semibold text-slate-300 bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 transition flex items-center justify-center gap-2 text-sm"
+            >
+              <span>Already have an account? Sign In</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -241,11 +323,11 @@ export default function TrackDelivery() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <button
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(user ? '/orders' : '/bundles')}
             className="flex items-center gap-2 text-blue-400 hover:text-blue-300 font-semibold mb-4 transition"
           >
             <ArrowLeft size={20} />
-            Back
+            {user ? 'Back to My Orders' : 'Back to Packages'}
           </button>
           <h1 className="text-3xl md:text-4xl font-bold text-white">Track Order</h1>
           <p className="text-gray-400 mt-2">Order #{order.id.slice(0, 8)}</p>
@@ -253,7 +335,7 @@ export default function TrackDelivery() {
         <div className="flex flex-wrap gap-3">
           <ReceiptDownload order={order as any} />
           <button
-            onClick={() => navigate(`/checkout?bundle=${order.bundle?.id}`)}
+            onClick={() => navigate(isGuest ? `/guest-checkout?bundle=${order.bundle?.id}` : `/checkout?bundle=${order.bundle?.id}`)}
             className="flex items-center gap-2 bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white px-6 py-2 md:py-3 rounded-lg font-semibold transition transform hover:scale-105"
           >
             <RefreshCw size={18} />

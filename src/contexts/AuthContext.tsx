@@ -14,7 +14,10 @@ interface AuthContextType {
   refreshProfile: () => Promise<void>;
   clearRecovery: () => void;
   isAdmin: boolean;
+  isSuperAdmin: boolean;
   isDriver: boolean;
+  isSupport: boolean;
+  isPacker: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -152,11 +155,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsRecoveringPassword(false);
   };
 
-  const isAdmin = profile?.role === 'admin';
+  const isSuperAdmin = profile?.role === 'super_admin';
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
   const isDriver = profile?.role === 'driver';
+  const isSupport = profile?.role === 'support';
+  const isPacker = profile?.role === 'packer';
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, isRecoveringPassword, signUp, signIn, signOut, refreshProfile, clearRecovery, isAdmin, isDriver }}>
+    <AuthContext.Provider value={{ user, profile, loading, isRecoveringPassword, signUp, signIn, signOut, refreshProfile, clearRecovery, isAdmin, isSuperAdmin, isDriver, isSupport, isPacker }}>
       {children}
     </AuthContext.Provider>
   );
