@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from '../lib/navigation';
-import { CreditCard, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react';
+import { CreditCard, CheckCircle, AlertCircle, ArrowRight, RotateCcw, Mail } from 'lucide-react';
 
 export default function GuestPayment() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [customEmail, setCustomEmail] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,6 +39,9 @@ export default function GuestPayment() {
         return;
       }
       setOrder(data);
+      if (data.email && data.email.includes('@') && !data.email.includes('@guest.food-bundle.com')) {
+        setCustomEmail(data.email);
+      }
     } catch (error) {
       console.error('Error loading order:', error);
       navigate('/packages');
@@ -50,9 +55,16 @@ export default function GuestPayment() {
 
     setProcessing(true);
     setPaymentStatus('idle');
+    setErrorMessage('');
 
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-payment`;
+
+      const cleanPhone = (order.phone || '').replace(/[^0-9]/g, '');
+      const rawEmail = customEmail.trim() || order.email?.trim() || '';
+      const emailToSend = (rawEmail && rawEmail.includes('@') && rawEmail.includes('.'))
+        ? rawEmail
+        : `${cleanPhone || 'guest' + Date.now()}@guest.food-bundle.com`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -61,7 +73,7 @@ export default function GuestPayment() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: order.email,
+          email: emailToSend,
           amount: order.total_amount,
           orderId: order.id,
           isGuest: true,
@@ -73,10 +85,11 @@ export default function GuestPayment() {
       if (data.authorization_url) {
         window.location.href = data.authorization_url;
       } else {
-        throw new Error('Failed to initialize payment');
+        throw new Error(data.error || data.message || 'Payment initialization failed');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payment error:', error);
+      setErrorMessage(error?.message || 'Failed to initialize Paystack checkout. Please try again.');
       setPaymentStatus('error');
       setProcessing(false);
     }
@@ -126,11 +139,32 @@ export default function GuestPayment() {
         )}
 
         {paymentStatus === 'error' && (
-          <div className="bg-red-500/20 border border-red-400/30 rounded-2xl p-6 mb-6 flex items-center space-x-4">
-            <AlertCircle className="w-12 h-12 text-red-400 flex-shrink-0" />
-            <div>
-              <h3 className="font-bold text-red-200 text-lg">Payment Failed</h3>
-              <p className="text-red-300">Please try again or contact support.</p>
+          <div className="bg-red-500/20 border border-red-400/40 rounded-2xl p-6 mb-6">
+            <div className="flex items-start space-x-4">
+              <AlertCircle className="w-8 h-8 text-red-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-bold text-red-100 text-lg">Payment Connection Failed</h3>
+                <p className="text-red-200 text-sm mt-1">
+                  {errorMessage || 'Unable to open Paystack checkout. Please try again or verify your connection.'}
+                </p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button
+                    onClick={() => {
+                      setPaymentStatus('idle');
+                      initiatePayment();
+                    }}
+                    className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-sm transition"
+                  >
+                    <RotateCcw size={14} /> Retry Payment Now
+                  </button>
+                  <button
+                    onClick={() => setPaymentStatus('idle')}
+                    className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-4 py-2.5 rounded-xl border border-white/20 transition"
+                  >
+                    Edit Email & Retry
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -149,9 +183,20 @@ export default function GuestPayment() {
                   <span className="text-gray-400">Name</span>
                   <span className="font-semibold text-white">{order.full_name}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Email</span>
-                  <span className="font-semibold text-white">{order.email}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                  <span className="text-gray-400">Receipt Email</span>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1 sm:w-64">
+                      <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="email"
+                        value={customEmail}
+                        onChange={(e) => setCustomEmail(e.target.value)}
+                        placeholder="your@email.com (optional)"
+                        className="w-full pl-9 pr-3 py-1.5 bg-slate-800/80 border border-white/20 text-white text-xs rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none"
+                      />
+                    </div>
+                  </div>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Phone</span>
@@ -186,20 +231,18 @@ export default function GuestPayment() {
               <div className="space-y-4">
                 <button
                   onClick={initiatePayment}
-                  disabled={processing || paymentStatus !== 'idle'}
+                  disabled={processing}
                   className="w-full bg-gradient-to-r from-emerald-500 to-blue-500 hover:from-emerald-600 hover:to-blue-600 text-white font-semibold py-4 px-6 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
                 >
                   {processing ? (
                     <>
                       <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      <span>Processing...</span>
+                      <span>Connecting to Paystack...</span>
                     </>
                   ) : (
-                    <span>Pay with Paystack</span>
+                    <span>Pay with Paystack • GH₵ {Number(order.total_amount).toFixed(2)}</span>
                   )}
                 </button>
-
-
               </div>
             </div>
           </>

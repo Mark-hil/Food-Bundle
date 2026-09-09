@@ -280,6 +280,8 @@ function AppContent() {
       {location.pathname === '/dashboard' && <Overview />}
       {location.pathname === '/dashboard/overview' && <Overview />}
       {location.pathname === '/checkout' && <Checkout />}
+      {location.pathname === '/guest-checkout' && <GuestCheckout />}
+      {location.pathname === '/guest-payment' && <GuestPayment />}
       {location.pathname === '/payment' && <Payment />}
       {location.pathname === '/payment/confirm' && <PaymentConfirm />}
       {location.pathname === '/payment/success' && <PaymentSuccess />}

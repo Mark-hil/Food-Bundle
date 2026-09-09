@@ -148,22 +148,49 @@ export default function GuestCheckout() {
     if (!bundle) return;
 
     setError('');
+
+    // Form field validation
+    if (!fullName.trim()) {
+      setError('Please enter your full name.');
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+      return;
+    }
+
+    const cleanedPhone = phone.replace(/[^0-9+]/g, '').trim();
+    if (!phone.trim() || cleanedPhone.replace(/\D/g, '').length < 9) {
+      setError('Please enter a valid phone number (at least 9 digits) for delivery contact.');
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+      return;
+    }
+
+    const trimmedEmail = email.trim();
+    if (trimmedEmail && (!trimmedEmail.includes('@') || !trimmedEmail.includes('.'))) {
+      setError('Please enter a valid email address, or leave it blank to use SMS/phone receipt.');
+      window.scrollTo({ top: 100, behavior: 'smooth' });
+      return;
+    }
+
+    const activeZone = deliveryZones.find(z => z.id === selectedZoneId);
+    const computedAddress = isCustomAddress 
+      ? deliveryAddress 
+      : activeZone 
+        ? `[${activeZone.hub_name} - ${activeZone.zone_name}] ${roomOrLandmark}`.trim()
+        : (deliveryAddress || roomOrLandmark);
+
+    if (!computedAddress || (!isCustomAddress && !roomOrLandmark.trim())) {
+      setError('Please specify your hostel room number, floor, or delivery location details.');
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+      return;
+    }
+
+    // Always ensure a valid email string for Paystack initialization
+    const safePaystackEmail = (trimmedEmail && trimmedEmail.includes('@'))
+      ? trimmedEmail
+      : `${cleanedPhone.replace(/\D/g, '') || 'guest'}@guest.food-bundle.com`;
+
     setSubmitting(true);
 
     try {
-      const activeZone = deliveryZones.find(z => z.id === selectedZoneId);
-      const computedAddress = isCustomAddress 
-        ? deliveryAddress 
-        : activeZone 
-          ? `[${activeZone.hub_name} - ${activeZone.zone_name}] ${roomOrLandmark}`.trim()
-          : (deliveryAddress || roomOrLandmark);
-
-      if (!computedAddress || (!isCustomAddress && !roomOrLandmark.trim())) {
-        setError('Please specify your hostel room number, floor, or delivery location details.');
-        setSubmitting(false);
-        return;
-      }
-
       const subtotal = Number(bundle.price) * quantity;
       const isFreeDelivery = subtotal >= freeDeliveryThreshold;
       const finalDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
@@ -173,9 +200,9 @@ export default function GuestCheckout() {
         .from('guest_orders')
         .insert({
           bundle_id: bundle.id,
-          full_name: fullName,
-          email,
-          phone,
+          full_name: fullName.trim(),
+          email: safePaystackEmail,
+          phone: phone.trim(),
           quantity,
           total_amount: totalAmount,
           delivery_fee: finalDeliveryFee,
@@ -193,10 +220,11 @@ export default function GuestCheckout() {
       if (orderError) throw orderError;
 
       navigate(`/guest-payment?order=${orderData.id}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating order:', error);
-      setError('Failed to create order. Please try again.');
+      setError(error.message || 'Failed to create order. Please try again.');
       setSubmitting(false);
+      window.scrollTo({ top: 100, behavior: 'smooth' });
     }
   };
 
