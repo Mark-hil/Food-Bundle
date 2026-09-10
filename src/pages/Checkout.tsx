@@ -568,7 +568,7 @@ export default function Checkout() {
             />
 
             {/* 2. Recipient Contact & Schedule */}
-            <div className="bg-slate-900/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl space-y-4">
+            <div className="bg-slate-900/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl space-y-4 relative z-0">
               <div className="flex items-center gap-2 pb-3 border-b border-white/10">
                 <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center border border-blue-500/30">
                   <Phone className="w-4 h-4" />
@@ -797,6 +797,11 @@ export default function Checkout() {
                 </span>
               </div>
 
+              <div className="flex justify-between text-emerald-400 text-xs font-medium">
+                <span className="flex items-center gap-1">⚡ Payment Processing</span>
+                <span className="font-bold">GH₵ 0.00 (Covered)</span>
+              </div>
+
               {freeDeliveryDiscount > 0 && (
                 <div className="flex justify-between text-emerald-400 font-bold bg-emerald-500/10 px-3 py-1.5 rounded-lg border border-emerald-500/20">
                   <span className="flex items-center gap-1">🎉 Free Delivery Triggered!</span>
@@ -836,7 +841,7 @@ export default function Checkout() {
               <div className="border-t border-white/10 pt-4 mt-3 flex items-center justify-between">
                 <div>
                   <span className="text-sm font-extrabold text-white block">Grand Total</span>
-                  <span className="text-[10px] text-gray-400">All taxes & campus fees included</span>
+                  <span className="text-[10px] text-gray-400">All taxes & MoMo charges included</span>
                 </div>
                 <span className="text-2xl font-black text-emerald-400 tracking-tight">
                   GH₵ {totalAmount.toFixed(2)}

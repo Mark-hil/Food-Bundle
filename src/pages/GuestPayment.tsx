@@ -215,7 +215,10 @@ export default function GuestPayment() {
               </div>
 
               <div className="pt-6 flex justify-between items-center">
-                <span className="text-xl font-bold text-white">Total Amount</span>
+                <div>
+                  <span className="text-xl font-bold text-white block">Total Amount</span>
+                  <span className="text-[10px] text-emerald-400 font-medium">0% Payment Fee • All MoMo charges covered</span>
+                </div>
                 <span className="text-3xl font-bold text-emerald-400">
                   GH₵ {Number(order.total_amount).toFixed(2)}
                 </span>

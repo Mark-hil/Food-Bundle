@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
 import { ArrowLeft, CreditCard as Edit, Plus, Lock, Rocket } from 'lucide-react';
 import ImageUpload from '../../components/ImageUpload';
+import PaystackFeeCalculator from '../../components/admin/PaystackFeeCalculator';
 
 export default function EditPackage() {
   const navigate = useNavigate();
@@ -87,7 +88,7 @@ export default function EditPackage() {
         setFormData({
           name: data.name,
           description: data.description,
-          price: (data.price / 100).toString(),
+          price: data.price != null ? data.price.toString() : '',
           duration_days: data.duration_days.toString(),
           items_per_week: data.items_per_week.toString(),
           image_url: data.image_url || '',
@@ -120,7 +121,7 @@ export default function EditPackage() {
         .update({
           name: formData.name.trim(),
           description: formData.description.trim(),
-          price: parseInt(formData.price) * 100,
+          price: parseFloat(formData.price) || 0,
           duration_days: parseInt(formData.duration_days) || 0,
           items_per_week: parseInt(formData.items_per_week) || 0,
           image_url: formData.image_url,
@@ -218,36 +219,48 @@ export default function EditPackage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Price (GH₵)
-                </label>
-                <input
-                  type="number"
-                  name="price"
-                  value={formData.price}
-                  onChange={handleChange}
-                  required
-                  step="0.01"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                  placeholder="0.00"
-                />
-              </div>
+            <div className="space-y-3">
+              <PaystackFeeCalculator
+                currentPrice={formData.price}
+                onApplyPrice={(calculatedPrice) => {
+                  setFormData(prev => ({ ...prev, price: calculatedPrice }));
+                }}
+              />
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Duration (Days)
-                </label>
-                <input
-                  type="number"
-                  name="duration_days"
-                  value={formData.duration_days}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
-                  placeholder="30"
-                />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Customer Selling Price (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="price"
+                    value={formData.price}
+                    onChange={handleChange}
+                    required
+                    step="0.01"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none font-bold text-slate-900"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    This is the final price students and guests will see and pay.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Duration (Days)
+                  </label>
+                  <input
+                    type="number"
+                    name="duration_days"
+                    value={formData.duration_days}
+                    onChange={handleChange}
+                    required
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                    placeholder="30"
+                  />
+                </div>
               </div>
             </div>
 

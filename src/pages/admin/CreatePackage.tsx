@@ -3,6 +3,7 @@ import { useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
 import { ArrowLeft, Plus, Lock, Rocket } from 'lucide-react';
 import ImageUpload from '../../components/ImageUpload';
+import PaystackFeeCalculator from '../../components/admin/PaystackFeeCalculator';
 
 export default function CreatePackage() {
   const navigate = useNavigate();
@@ -83,7 +84,7 @@ export default function CreatePackage() {
         .insert([{
           name: formData.name.trim(),
           description: formData.description.trim(),
-          price: parseInt(formData.price) * 100,
+          price: parseFloat(formData.price) || 0,
           duration_days: parseInt(formData.duration_days) || 0,
           items_per_week: parseInt(formData.items_per_week) || 0,
           image_url: formData.image_url,
@@ -172,8 +173,16 @@ export default function CreatePackage() {
             </div>
 
             <div>
+              <PaystackFeeCalculator
+                currentPrice={formData.price}
+                onApplyPrice={(calculatedPrice) => {
+                  setFormData(prev => ({ ...prev, price: calculatedPrice }));
+                }}
+                className="mb-3"
+              />
+
               <label className="block text-sm font-medium text-slate-700 mb-2">
-                Price (GH₵)
+                Customer Selling Price (GH₵)
               </label>
               <input
                 type="number"
@@ -183,9 +192,12 @@ export default function CreatePackage() {
                 required
                 min="0"
                 step="0.01"
-                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none font-bold text-slate-900"
                 placeholder="0.00"
               />
+              <p className="text-xs text-slate-500 mt-1">
+                This is the final price students and guests will see and pay.
+              </p>
             </div>
 
             <div>

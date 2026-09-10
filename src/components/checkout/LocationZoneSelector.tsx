@@ -91,7 +91,9 @@ export default function LocationZoneSelector({
   };
 
   return (
-    <div className="bg-slate-900/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl space-y-4">
+    <div className={`bg-slate-900/80 backdrop-blur-xl border border-white/15 rounded-2xl p-5 shadow-xl space-y-4 relative transition-all duration-200 ${
+      isHubOpen || isZoneOpen ? 'z-30' : 'z-10'
+    }`}>
       {/* Header with Switch Option */}
       <div className="flex items-center justify-between pb-3 border-b border-white/10">
         <div className="flex items-center gap-2">
@@ -117,7 +119,7 @@ export default function LocationZoneSelector({
       {!isCustomAddress && deliveryZones.length > 0 ? (
         <div className="space-y-4">
           {/* Step 1: Custom Hub Selector Dropdown */}
-          <div className="space-y-1.5" ref={hubRef}>
+          <div className={`space-y-1.5 ${isHubOpen ? 'relative z-30' : 'relative z-20'}`} ref={hubRef}>
             <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
               1. University Campus / City Hub
             </label>
@@ -156,8 +158,8 @@ export default function LocationZoneSelector({
 
               {/* Hub Dropdown Popover */}
               {isHubOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
-                  <div className="p-2 divide-y divide-white/5">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-72 flex flex-col">
+                  <div className="p-2 divide-y divide-white/5 overflow-y-auto">
                     {uniqueHubs.map((hub) => {
                       const isSelected = selectedHub === hub;
                       const hubZoneCount = deliveryZones.filter(z => z.hub_name === hub).length;
@@ -204,7 +206,7 @@ export default function LocationZoneSelector({
           </div>
 
           {/* Step 2: Custom Hostel / Zone Dropdown */}
-          <div className="space-y-1.5" ref={zoneRef}>
+          <div className={`space-y-1.5 ${isZoneOpen ? 'relative z-30' : 'relative z-10'}`} ref={zoneRef}>
             <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
               2. Hostel / Delivery Zone
             </label>
@@ -246,7 +248,7 @@ export default function LocationZoneSelector({
 
               {/* Zone Dropdown Popover */}
               {isZoneOpen && (
-                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-white/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-80 flex flex-col">
+                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900/95 backdrop-blur-2xl border border-white/20 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 max-h-80 flex flex-col">
                   {/* Search Bar if multiple zones */}
                   {zonesForCurrentHub.length > 4 && (
                     <div className="p-3 border-b border-white/10 bg-slate-950/60 sticky top-0 z-10">
@@ -337,7 +339,7 @@ export default function LocationZoneSelector({
           )}
 
           {/* Step 3: Room Number & Landmark */}
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 relative z-0">
             <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider">
               3. Room Number, Floor or Specific Landmark
             </label>
