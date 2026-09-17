@@ -24,7 +24,6 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [studentId, setStudentId] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -67,7 +66,7 @@ export default function Register() {
       return;
     }
 
-    const { error } = await signUp(email, password, fullName, phone, studentId);
+    const { error } = await signUp(email, password, fullName, phone);
 
     if (error) {
       setError(error.message);
@@ -149,23 +148,8 @@ export default function Register() {
                   </div>
                 </div>
 
-                {/* Student ID */}
-                <div className="animate-in" style={{ animationDelay: '0.15s' }}>
-                  <label htmlFor="studentId" className="block text-sm font-medium text-white mb-2">
-                    Student ID
-                  </label>
-                  <input
-                    id="studentId"
-                    type="text"
-                    value={studentId}
-                    onChange={(e) => setStudentId(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-400 focus:bg-white/20 transition"
-                    placeholder="UEB1234567"
-                  />
-                </div>
-
                 {/* Email */}
-                <div className="animate-in" style={{ animationDelay: '0.2s' }}>
+                <div className="animate-in" style={{ animationDelay: '0.15s' }}>
                   <label htmlFor="email" className="block text-sm font-medium text-white mb-2">
                     Email Address
                   </label>
