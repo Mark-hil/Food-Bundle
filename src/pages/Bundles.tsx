@@ -185,12 +185,16 @@ export default function Bundles() {
 
   const handleCustomizationConfirm = (customItems: string[]) => {
     if (!customizingBundle) return;
+    const hasCustomItems = Array.isArray(customItems) && customItems.length > 0;
     const customId = crypto.randomUUID();
-    sessionStorage.setItem(`custom_bundle_${customId}`, JSON.stringify(customItems));
+    if (hasCustomItems) {
+      sessionStorage.setItem(`custom_bundle_${customId}`, JSON.stringify(customItems));
+    }
+    const customParam = hasCustomItems ? `&custom=${customId}` : '';
     if (user) {
-      navigate(`/checkout?bundle=${customizingBundle.id}&custom=${customId}${isSubscribing ? '&subscribe=true' : ''}`);
+      navigate(`/checkout?bundle=${customizingBundle.id}${customParam}${isSubscribing ? '&subscribe=true' : ''}`);
     } else {
-      navigate(`/guest-checkout?bundle=${customizingBundle.id}&custom=${customId}`);
+      navigate(`/guest-checkout?bundle=${customizingBundle.id}${customParam}`);
     }
     setCustomizingBundle(null);
   };
@@ -309,6 +313,16 @@ export default function Bundles() {
               <ShoppingCart size={17} />
               <span>{bundle.is_customizable ? 'Customize & Order as Guest' : 'Order Now as Guest'}</span>
             </button>
+            {bundle.is_customizable && (
+              <button
+                type="button"
+                onClick={() => navigate(`/guest-checkout?bundle=${bundle.id}`)}
+                className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition"
+              >
+                <CheckCircle size={14} className="text-emerald-400" />
+                <span>Order Standard Package (No Customization)</span>
+              </button>
+            )}
             <Link
               to="/register"
               className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition"
@@ -348,8 +362,9 @@ export default function Bundles() {
         />
         <style>{styles}</style>
 
-        <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 py-20 text-slate-100">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-20 text-slate-100 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-emerald-500/10 opacity-50 pointer-events-none"></div>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
             
             {/* Header Title */}
             <div className="text-center mb-10 animate-in">
@@ -557,6 +572,15 @@ export default function Bundles() {
                     >
                       Subscribe
                     </button>
+                    {bundle.is_customizable && (
+                      <button
+                        onClick={() => navigate(`/checkout?bundle=${bundle.id}`)}
+                        className="bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white border border-emerald-500/30 font-semibold px-3 py-2 rounded-lg transition text-xs"
+                        title="Order standard package without customization"
+                      >
+                        Order Standard
+                      </button>
+                    )}
                     <button
                       onClick={() => handleActionClick(bundle, false)}
                       className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-semibold px-4 py-2 rounded-lg transition transform hover:scale-105 text-sm"
