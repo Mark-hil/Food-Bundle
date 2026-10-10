@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from '../lib/navigation';
 import { 
@@ -31,6 +31,16 @@ export default function GuestCheckout() {
   const [quantity, setQuantity] = useState(1);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+
+  // Earliest delivery date is tomorrow (same-day delivery is disallowed)
+  const minDeliveryDate = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yyyy = tomorrow.getFullYear();
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const dd = String(tomorrow.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
   const [deliveryTime, setDeliveryTime] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
@@ -179,6 +189,12 @@ export default function GuestCheckout() {
 
     if (!computedAddress || (!isCustomAddress && !roomOrLandmark.trim())) {
       setError('Please specify your hostel room number, floor, or delivery location details.');
+      window.scrollTo({ top: 200, behavior: 'smooth' });
+      return;
+    }
+
+    if (deliveryDate && deliveryDate < minDeliveryDate) {
+      setError('Preferred delivery date cannot be today or in the past. Deliveries must be scheduled for tomorrow or later.');
       window.scrollTo({ top: 200, behavior: 'smooth' });
       return;
     }
@@ -461,14 +477,27 @@ export default function GuestCheckout() {
                     Preferred Delivery Date
                   </label>
                   <div className="relative">
-                    <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
                       type="date"
+                      min={minDeliveryDate}
                       value={deliveryDate}
-                      onChange={(e) => setDeliveryDate(e.target.value)}
+                      onChange={(e) => {
+                        const selected = e.target.value;
+                        if (selected && selected < minDeliveryDate) {
+                          setError('Preferred delivery date cannot be today or in the past. Please select tomorrow or a later date.');
+                          setDeliveryDate('');
+                          return;
+                        }
+                        setError('');
+                        setDeliveryDate(selected);
+                      }}
                       className="w-full pl-10 pr-4 py-3 bg-slate-800/90 border border-white/15 text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm font-medium"
                     />
                   </div>
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    Earliest available delivery date is tomorrow (same-day delivery is not supported).
+                  </p>
                 </div>
 
                 {/* Time Window Selector */}
@@ -562,10 +591,14 @@ export default function GuestCheckout() {
                 <div className="flex justify-between text-gray-300 border-t border-white/10 pt-2 mt-2">
                   <span>Delivery Fee</span>
                   <span className="font-semibold text-white">
-                    {isFreeDelivery ? (
+                    {isFreeDelivery && deliveryFee > 0 ? (
                       <span className="line-through text-gray-500 mr-1.5">GH₵ {deliveryFee.toFixed(2)}</span>
                     ) : null}
-                    GH₵ {finalDeliveryFee.toFixed(2)}
+                    {finalDeliveryFee === 0 ? (
+                      <span className="text-emerald-400 font-bold">FREE</span>
+                    ) : (
+                      `GH₵ ${finalDeliveryFee.toFixed(2)}`
+                    )}
                   </span>
                 </div>
 

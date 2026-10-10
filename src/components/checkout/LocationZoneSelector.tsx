@@ -238,8 +238,12 @@ export default function LocationZoneSelector({
 
                 <div className="flex items-center gap-2 shrink-0">
                   {activeZone && (
-                    <span className="text-xs font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
-                      GH₵ {Number(activeZone.delivery_fee).toFixed(2)}
+                    <span className={`text-xs font-extrabold px-2.5 py-1 rounded-lg ${
+                      Number(activeZone.delivery_fee) === 0
+                        ? 'bg-emerald-500 text-white shadow-sm'
+                        : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }`}>
+                      {Number(activeZone.delivery_fee) === 0 ? 'FREE Delivery' : `GH₵ ${Number(activeZone.delivery_fee).toFixed(2)}`}
                     </span>
                   )}
                   <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-300 ${isZoneOpen ? 'rotate-180 text-emerald-400' : ''}`} />
@@ -305,9 +309,11 @@ export default function LocationZoneSelector({
                               <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md ${
                                 isSelected 
                                   ? 'bg-emerald-500 text-white' 
-                                  : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
+                                  : Number(zone.delivery_fee) === 0
+                                    ? 'bg-emerald-500/25 text-emerald-300 border border-emerald-500/40'
+                                    : 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20'
                               }`}>
-                                GH₵ {Number(zone.delivery_fee).toFixed(2)}
+                                {Number(zone.delivery_fee) === 0 ? 'FREE' : `GH₵ ${Number(zone.delivery_fee).toFixed(2)}`}
                               </span>
                               {isSelected && (
                                 <Check className="w-4 h-4 text-emerald-400" />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Bundle } from '../lib/supabase';
 import { Link, useNavigate } from '../lib/navigation';
-import { ShoppingCart, Clock, CheckCircle, Star, Settings, Check, ArrowRight, Zap, Crown, Rocket, Sliders, ShoppingBag, Shield, UserPlus } from 'lucide-react';
+import { ShoppingCart, CheckCircle, Star, ArrowRight, Crown, Sliders, ShoppingBag, Shield } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import CustomizationModal from '../components/CustomizationModal';
 import SEO from '../components/SEO';
@@ -12,47 +12,6 @@ interface BundleWithRating extends Bundle {
   averageRating?: number;
   reviewCount?: number;
 }
-
-const packageMeta: Record<string, { badge: string; icon: any; iconColor: string; highlight: boolean }> = {
-  ALPHA: {
-    badge: 'Premium Pack',
-    icon: Zap,
-    iconColor: 'from-blue-500 to-blue-600',
-    highlight: false,
-  },
-  BETA: {
-    badge: 'Most Popular',
-    icon: Crown,
-    iconColor: 'from-emerald-500 to-emerald-600',
-    highlight: true,
-  },
-  GAMMA: {
-    badge: 'Best Value',
-    icon: Rocket,
-    iconColor: 'from-amber-500 to-amber-600',
-    highlight: false,
-  },
-};
-
-const getBundleMeta = (bundle: Bundle) => {
-  if (packageMeta[bundle.name]) {
-    return packageMeta[bundle.name];
-  }
-  if (bundle.is_customizable) {
-    return {
-      badge: 'Customizable Pack',
-      icon: Sliders,
-      iconColor: 'from-purple-500 to-indigo-600',
-      highlight: false,
-    };
-  }
-  return {
-    badge: 'Special Selection',
-    icon: ShoppingBag,
-    iconColor: 'from-teal-500 to-emerald-600',
-    highlight: false,
-  };
-};
 
 export default function Bundles() {
   const [bundles, setBundles] = useState<BundleWithRating[]>([]);
@@ -211,43 +170,33 @@ export default function Bundles() {
 
   // ── Public / Guest Card Renderer ──────────────────────────────────────────
   const renderPublicBundleCard = (bundle: BundleWithRating, idx: number) => {
-    const meta = getBundleMeta(bundle);
-    const Icon = meta.icon;
     const price = Number(bundle.price);
 
     return (
       <div
         key={bundle.id}
-        className={`rounded-3xl p-6 sm:p-8 transition-all duration-300 transform hover:-translate-y-1 animate-in backdrop-blur-xl border flex flex-col justify-between ${
-          meta.highlight
-            ? 'bg-gradient-to-br from-emerald-500/15 via-slate-900/90 to-blue-500/15 border-emerald-400/50 ring-2 ring-emerald-400/40 shadow-xl shadow-emerald-950/40'
-            : 'bg-white/5 border-white/10 hover:border-blue-400/40 shadow-lg'
-        }`}
+        className="group flex animate-in"
         style={{ animationDelay: `${0.1 + idx * 0.1}s` }}
       >
-        <div>
-          {/* Badge & Category Icon */}
-          <div className="flex items-start justify-between mb-4">
-            <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold ${
-              meta.highlight ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30' : 'bg-blue-400/20 text-blue-300 border border-blue-400/30'
-            }`}>
-              <Icon size={13} />
-              <span>{meta.badge}</span>
-            </div>
-            <div className={`bg-gradient-to-br ${meta.iconColor} p-2.5 rounded-2xl shadow-md`}>
-              <Icon className="text-white" size={20} />
-            </div>
+        <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 flex flex-col relative">
+          
+          {/* Dynamic Badge */}
+          <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold z-10 shadow-lg">
+            {bundle.name === 'ALPHA' && '⭐ Premium Pack'}
+            {bundle.name === 'BETA' && '🔥 Most Popular'}
+            {bundle.name === 'GAMMA' && '💎 Best Value'}
+            {bundle.name !== 'ALPHA' && bundle.name !== 'BETA' && bundle.name !== 'GAMMA' && (bundle.is_customizable ? '✨ Customizable' : '⭐ Fresh Pick')}
           </div>
 
-          {/* Image */}
+          {/* Image Display */}
           {bundle.image_url ? (
-            <div className="w-full h-48 mb-6 rounded-2xl overflow-hidden relative group shadow-md">
+            <div className="w-full h-48 overflow-hidden relative bg-slate-800">
               <img
                 src={bundle.image_url}
                 alt={bundle.name}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
               {bundle.is_customizable && (
                 <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow">
                   <Sliders size={13} className="text-amber-400" />
@@ -256,96 +205,85 @@ export default function Bundles() {
               )}
             </div>
           ) : (
-            <div className="w-full h-48 mb-6 rounded-2xl bg-slate-800/80 flex items-center justify-center border border-white/5">
-              <ShoppingCart className="w-16 h-16 text-slate-600" />
+            <div className="w-full h-36 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center border-b border-white/5">
+              <ShoppingBag className="w-12 h-12 text-slate-600" />
             </div>
           )}
 
-          {/* Title & Description */}
-          <div className="flex items-baseline justify-between mb-2">
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">{bundle.name}</h3>
-          </div>
-          
-          <p className={`mb-4 text-xs sm:text-sm line-clamp-2 leading-relaxed ${meta.highlight ? 'text-emerald-100/90' : 'text-gray-300'}`}>
-            {bundle.description || 'Nutritious, high-quality meal package prepared for students.'}
-          </p>
-
-          {/* Ratings & Delivery */}
-          <div className="flex items-center justify-between gap-2 mb-6 pb-4 border-b border-white/10">
-            {bundle.averageRating ? (
-              renderStars(bundle.averageRating, bundle.reviewCount)
-            ) : (
-              <span className="text-xs text-gray-400 flex items-center gap-1">
-                <CheckCircle size={13} className="text-emerald-400" /> Fresh Selection
-              </span>
-            )}
-            <span className="text-[11px] text-gray-400 flex items-center gap-1">
-              <Clock size={12} className="text-blue-400" />
-              {bundle.delivery_days && bundle.delivery_days.length > 0 ? bundle.delivery_days.join(', ') : 'Daily Delivery'}
-            </span>
-          </div>
-
-          {/* Price */}
-          <div className="mb-6">
-            <div className="flex items-baseline gap-1.5">
-              <span className="text-4xl sm:text-5xl font-black text-white font-display tracking-tight">GH₵{price.toFixed(0)}</span>
-              <span className="text-xs text-gray-400 font-medium">/ package</span>
-            </div>
-            {Boolean(bundle.duration_days && bundle.duration_days > 0) && (
-              <p className="text-[11px] text-emerald-400 font-semibold mt-1">
-                Covers ~{bundle.duration_days} Days {bundle.items_per_week ? `(${bundle.items_per_week} meals/week)` : ''}
+          <div className="p-6 flex flex-col flex-grow">
+            {/* Header */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className="text-xl font-bold text-white">{bundle.name}</h3>
+                {bundle.averageRating ? (
+                  renderStars(bundle.averageRating, bundle.reviewCount)
+                ) : null}
+              </div>
+              <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed">
+                {bundle.description || 'Nutritious, high-yield student meal package.'}
               </p>
-            )}
-          </div>
-        </div>
+            </div>
 
-        <div>
-          {/* Order Actions */}
-          <div className="space-y-2 mb-6">
-            <button
-              onClick={() => handleGuestOrder(bundle.id)}
-              className={`flex items-center justify-center gap-2 w-full py-3.5 rounded-2xl font-bold transition transform active:scale-95 text-sm shadow-md ${
-                meta.highlight
-                  ? 'bg-gradient-to-r from-emerald-400 to-blue-500 text-slate-950 hover:shadow-emerald-400/30'
-                  : 'bg-white text-slate-900 hover:bg-slate-100'
-              }`}
-            >
-              <ShoppingCart size={17} />
-              <span>{bundle.is_customizable ? 'Customize & Order as Guest' : 'Order Now as Guest'}</span>
-            </button>
-            {bundle.is_customizable && (
-              <button
-                type="button"
-                onClick={() => navigate(`/guest-checkout?bundle=${bundle.id}`)}
-                className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition"
-              >
-                <CheckCircle size={14} className="text-emerald-400" />
-                <span>Order Standard Package (No Customization)</span>
-              </button>
-            )}
-            <Link
-              to="/register"
-              className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-xl text-xs font-semibold text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition"
-            >
-              <UserPlus size={14} className="text-blue-400" />
-              <span>Sign up for Weekly Subscription</span>
-            </Link>
-          </div>
-
-          {/* Items Preview */}
-          {bundle.items && bundle.items.length > 0 && (
-            <div className="space-y-2 pt-2 border-t border-white/10">
-              <h4 className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">Package Items</h4>
-              <div className="flex flex-wrap gap-1.5">
-                {bundle.items.map((item: string, i: number) => (
-                  <span key={i} className="inline-flex items-center gap-1 text-[11px] bg-white/10 text-gray-200 px-2.5 py-1 rounded-lg border border-white/10">
-                    <Check size={11} className="text-emerald-400" />
+            {/* Items List - Shows ALL items */}
+            <div className="mb-6 bg-white/5 p-4 rounded-xl flex-grow border border-white/5">
+              <p className="text-[11px] font-bold text-blue-400 mb-2.5 uppercase tracking-wider">Package Includes</p>
+              <ul className="space-y-1.5">
+                {Array.isArray(bundle.items) && bundle.items.map((item: string, i: number) => (
+                  <li key={i} className="text-slate-300 text-xs flex items-center gap-2">
+                    <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
                     <span>{item}</span>
-                  </span>
+                  </li>
                 ))}
+              </ul>
+            </div>
+
+            {/* Price & Delivery Notice */}
+            <div className="mb-5 pb-5 border-b border-white/10 mt-auto flex items-end justify-between">
+              <div>
+                <p className="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">Bundle Price</p>
+                <p className="text-3xl font-black text-white">
+                  GH₵ {price.toFixed(0)}
+                </p>
+                {Boolean(bundle.duration_days && bundle.duration_days > 0) && (
+                  <p className="text-[10px] text-emerald-400 font-medium mt-0.5">
+                    ~{bundle.duration_days} Days coverage
+                  </p>
+                )}
+              </div>
+              <div className="text-right">
+                <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md font-medium border border-emerald-500/20">
+                  Next-Day Drop
+                </span>
               </div>
             </div>
-          )}
+
+            {/* Action Buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={() => handleGuestOrder(bundle.id)}
+                className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white py-3 rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 font-bold transition-all text-center block text-sm"
+              >
+                {bundle.is_customizable ? 'Customize & Order as Guest' : 'Order as Guest (Quick Checkout)'}
+              </button>
+              {bundle.is_customizable && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/guest-checkout?bundle=${bundle.id}`)}
+                  className="flex items-center justify-center gap-1.5 w-full py-2 rounded-xl text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition"
+                >
+                  <CheckCircle size={13} className="text-emerald-400" />
+                  <span>Order Standard (No Customization)</span>
+                </button>
+              )}
+              <Link
+                to="/register"
+                className="w-full bg-white/10 hover:bg-white/15 text-slate-200 py-2 rounded-xl text-xs font-semibold text-center block transition border border-white/10"
+              >
+                Sign up for Weekly Subscriptions
+              </Link>
+            </div>
+
+          </div>
         </div>
       </div>
     );
@@ -495,155 +433,177 @@ export default function Bundles() {
           <p className="text-gray-400 text-lg">No bundles available at the moment</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {bundles.map((bundle) => (
             <div
               key={bundle.id}
-              className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl hover:border-blue-500/50 transition-all duration-300 transform hover:scale-105 overflow-hidden"
+              className="group flex"
             >
-              <div className="h-48 bg-slate-800 flex items-center justify-center relative">
+              <div className="w-full bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden hover:border-emerald-500/50 hover:shadow-2xl hover:shadow-emerald-500/10 transition-all duration-300 flex flex-col relative">
+                
+                {/* Dynamic Badge */}
+                <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-emerald-500 text-white px-3 py-1 rounded-full text-xs font-bold z-10 shadow-lg">
+                  {bundle.name === 'ALPHA' && '⭐ Premium Pack'}
+                  {bundle.name === 'BETA' && '🔥 Most Popular'}
+                  {bundle.name === 'GAMMA' && '💎 Best Value'}
+                  {bundle.name !== 'ALPHA' && bundle.name !== 'BETA' && bundle.name !== 'GAMMA' && (bundle.is_customizable ? '✨ Customizable' : '⭐ Fresh Pick')}
+                </div>
+
+                {/* Image Display */}
                 {bundle.image_url ? (
-                  <>
+                  <div className="w-full h-48 overflow-hidden relative bg-slate-800">
                     <img
                       src={bundle.image_url}
                       alt={bundle.name}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 to-transparent"></div>
-                  </>
-                ) : (
-                  <ShoppingCart className="w-20 h-20 text-slate-600" />
-                )}
-              </div>
-
-              <div className="p-6 relative">
-                <h3 className="text-xl font-bold text-white mb-2">{bundle.name}</h3>
-                <p className="text-gray-400 text-sm mb-4 line-clamp-2">
-                  {bundle.description || 'Delicious meal bundle'}
-                </p>
-
-                <div className="mb-4">
-                  {bundle.items && bundle.items.length > 0 ? (
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {bundle.items.map((item, idx) => (
-                        <span key={idx} className="text-[10px] bg-white/10 text-gray-200 px-2 py-1 rounded-md border border-white/10">
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="flex items-center text-sm text-gray-300 mb-2">
-                      <CheckCircle className="w-4 h-4 mr-2 text-emerald-400" />
-                      <span>0 items included</span>
-                    </div>
-                  )}
-                  {bundle.is_customizable && (
-                    <div className="flex items-center text-sm text-blue-300 mb-2 font-medium">
-                      <Settings className="w-4 h-4 mr-2" />
-                      <span>Customizable Bundle</span>
-                    </div>
-                  )}
-                  <div className="flex items-center text-sm text-gray-300">
-                    <Clock className="w-4 h-4 mr-2 text-blue-400" />
-                    <span>Delivery: {bundle.delivery_days?.join(', ') || 'Weekdays'}</span>
-                  </div>
-                </div>
-
-                <div className="mb-3 pt-2">
-                  {renderStars(bundle.averageRating)}
-                </div>
-
-                <div className="flex items-center justify-between pt-4 border-t border-white/10">
-                  <div>
-                    <span className="text-2xl font-bold text-white">
-                      GH₵ {Number(bundle.price).toFixed(2)}
-                    </span>
-                  </div>
-                  <div className="flex gap-2 flex-wrap justify-end">
-                    <button
-                      onClick={() => setReviewingBundleId(bundle.id)}
-                      className="bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2 rounded-lg transition text-sm"
-                    >
-                      Rate
-                    </button>
-                    <button
-                      onClick={() => handleActionClick(bundle, true)}
-                      className="bg-gradient-to-r from-purple-500 to-pink-500 hover:shadow-lg hover:shadow-purple-500/50 text-white font-semibold px-4 py-2 rounded-lg transition transform hover:scale-105 text-sm"
-                    >
-                      Subscribe
-                    </button>
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent"></div>
                     {bundle.is_customizable && (
-                      <button
-                        onClick={() => navigate(`/checkout?bundle=${bundle.id}`)}
-                        className="bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 hover:text-white border border-emerald-500/30 font-semibold px-3 py-2 rounded-lg transition text-xs"
-                        title="Order standard package without customization"
-                      >
-                        Order Standard
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleActionClick(bundle, false)}
-                      className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-semibold px-4 py-2 rounded-lg transition transform hover:scale-105 text-sm"
-                    >
-                      {bundle.is_customizable ? 'Customize & Order' : 'Order Now'}
-                    </button>
-                  </div>
-                </div>
-
-                {reviewingBundleId === bundle.id && (
-                  <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
-                    <h4 className="font-semibold text-white mb-3">Leave a Review</h4>
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Rating
-                      </label>
-                      <div className="flex gap-2">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            onClick={() => setReviewRating(star)}
-                            className="transition"
-                          >
-                            <Star
-                              className={`w-6 h-6 ${
-                                star <= reviewRating
-                                  ? 'fill-yellow-400 text-yellow-400'
-                                  : 'text-gray-600 hover:text-yellow-300'
-                              }`}
-                            />
-                          </button>
-                        ))}
+                      <div className="absolute bottom-3 left-3 bg-slate-900/80 backdrop-blur-md border border-white/20 text-amber-300 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shadow">
+                        <Sliders size={13} className="text-amber-400" />
+                        Customizable
                       </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="w-full h-36 bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center border-b border-white/5">
+                    <ShoppingBag className="w-12 h-12 text-slate-600" />
+                  </div>
+                )}
+
+                <div className="p-6 flex flex-col flex-grow">
+                  {/* Header */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <h3 className="text-xl font-bold text-white">{bundle.name}</h3>
+                      {bundle.averageRating ? (
+                        renderStars(bundle.averageRating, bundle.reviewCount)
+                      ) : null}
                     </div>
-                    <div className="mb-3">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Comment (Optional)
-                      </label>
-                      <textarea
-                        value={reviewComment}
-                        onChange={(e) => setReviewComment(e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-800/50 border border-white/10 text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm placeholder-gray-500"
-                        rows={2}
-                        placeholder="Share your thoughts about this bundle"
-                      />
+                    <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed">
+                      {bundle.description || 'Nutritious, high-yield student meal package.'}
+                    </p>
+                  </div>
+
+                  {/* Items List - Shows ALL items */}
+                  <div className="mb-6 bg-white/5 p-4 rounded-xl flex-grow border border-white/5">
+                    <p className="text-[11px] font-bold text-blue-400 mb-2.5 uppercase tracking-wider">Package Includes</p>
+                    <ul className="space-y-1.5">
+                      {Array.isArray(bundle.items) && bundle.items.map((item: string, i: number) => (
+                        <li key={i} className="text-slate-300 text-xs flex items-center gap-2">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Price & Delivery Notice */}
+                  <div className="mb-5 pb-5 border-b border-white/10 mt-auto flex items-end justify-between">
+                    <div>
+                      <p className="text-slate-400 text-[11px] uppercase tracking-wider font-semibold">Bundle Price</p>
+                      <p className="text-3xl font-black text-white">
+                        GH₵ {Number(bundle.price).toFixed(0)}
+                      </p>
+                      {Boolean(bundle.duration_days && bundle.duration_days > 0) && (
+                        <p className="text-[10px] text-emerald-400 font-medium mt-0.5">
+                          ~{bundle.duration_days} Days coverage
+                        </p>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[11px] text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-md font-medium border border-emerald-500/20">
+                        Next-Day Drop
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => handleActionClick(bundle, false)}
+                        className="w-full bg-gradient-to-r from-blue-500 to-emerald-500 text-white py-2.5 rounded-xl hover:shadow-lg hover:shadow-emerald-500/30 font-bold transition-all text-center text-xs"
+                      >
+                        {bundle.is_customizable ? 'Customize & Order' : 'Order Now'}
+                      </button>
+                      <button
+                        onClick={() => handleActionClick(bundle, true)}
+                        className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white py-2.5 rounded-xl hover:shadow-lg hover:shadow-purple-500/30 font-bold transition-all text-center text-xs"
+                      >
+                        Subscribe
+                      </button>
                     </div>
                     <div className="flex gap-2">
+                      {bundle.is_customizable && (
+                        <button
+                          onClick={() => navigate(`/checkout?bundle=${bundle.id}`)}
+                          className="flex-1 bg-white/5 hover:bg-white/10 text-emerald-300 py-1.5 rounded-xl text-[11px] font-semibold transition border border-white/10 text-center"
+                        >
+                          Order Standard (Skip Custom)
+                        </button>
+                      )}
                       <button
-                        onClick={() => submitReview(bundle.id)}
-                        disabled={submittingReview}
-                        className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-semibold px-4 py-2 rounded-lg transition disabled:opacity-50 text-sm"
+                        onClick={() => setReviewingBundleId(bundle.id)}
+                        className="px-3 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white py-1.5 rounded-xl text-[11px] font-semibold transition border border-white/10"
                       >
-                        {submittingReview ? 'Submitting...' : 'Submit'}
-                      </button>
-                      <button
-                        onClick={() => setReviewingBundleId(null)}
-                        className="bg-white/10 hover:bg-white/20 text-white font-semibold px-4 py-2 rounded-lg transition text-sm"
-                      >
-                        Cancel
+                        Rate
                       </button>
                     </div>
                   </div>
-                )}
+
+                  {/* Review Form Drawer */}
+                  {reviewingBundleId === bundle.id && (
+                    <div className="mt-4 p-4 bg-white/5 rounded-xl border border-white/10">
+                      <h4 className="font-semibold text-white mb-2 text-xs">Leave a Review</h4>
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-300 mb-1">Rating</label>
+                        <div className="flex gap-1.5">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              onClick={() => setReviewRating(star)}
+                              className="transition"
+                            >
+                              <Star
+                                className={`w-5 h-5 ${
+                                  star <= reviewRating
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-gray-600 hover:text-yellow-300'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="mb-2">
+                        <textarea
+                          value={reviewComment}
+                          onChange={(e) => setReviewComment(e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-800/80 border border-white/10 text-white rounded-lg focus:ring-1 focus:ring-blue-500 outline-none text-xs placeholder-gray-500"
+                          rows={2}
+                          placeholder="Share your thoughts about this bundle"
+                        />
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => submitReview(bundle.id)}
+                          disabled={submittingReview}
+                          className="bg-gradient-to-r from-blue-500 to-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg transition disabled:opacity-50 text-xs"
+                        >
+                          {submittingReview ? 'Submitting...' : 'Submit'}
+                        </button>
+                        <button
+                          onClick={() => setReviewingBundleId(null)}
+                          className="bg-white/10 hover:bg-white/20 text-white font-semibold px-3 py-1.5 rounded-lg transition text-xs"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
               </div>
             </div>
           ))}

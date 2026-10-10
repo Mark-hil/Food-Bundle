@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { supabase, Bundle } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '../lib/navigation';
@@ -29,6 +29,16 @@ export default function Checkout() {
   const [quantity, setQuantity] = useState(1);
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState('');
+
+  // Earliest delivery date is tomorrow (same-day delivery is disallowed)
+  const minDeliveryDate = useMemo(() => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const yyyy = tomorrow.getFullYear();
+    const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+    const dd = String(tomorrow.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
   const [deliveryTime, setDeliveryTime] = useState('');
   const [deliveryPhone, setDeliveryPhone] = useState('');
   const [notes, setNotes] = useState('');
@@ -362,6 +372,12 @@ export default function Checkout() {
         return;
       }
 
+      if (deliveryDate && deliveryDate < minDeliveryDate) {
+        setError('Preferred delivery date cannot be today or in the past. Deliveries must be scheduled for tomorrow or later.');
+        setSubmitting(false);
+        return;
+      }
+
       const deliveryCount = isSubscription ? 3 : 1;
       const baseDeliveryCost = deliveryFee * deliveryCount;
       const subtotal = Number(bundle.price) * quantity * (isSubscription ? 3 : 1);
@@ -601,14 +617,27 @@ export default function Checkout() {
                   Preferred Delivery Date
                 </label>
                 <div className="relative">
-                  <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Calendar className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   <input
                     type="date"
+                    min={minDeliveryDate}
                     value={deliveryDate}
-                    onChange={(e) => setDeliveryDate(e.target.value)}
+                    onChange={(e) => {
+                      const selected = e.target.value;
+                      if (selected && selected < minDeliveryDate) {
+                        setError('Preferred delivery date cannot be today or in the past. Please select tomorrow or a later date.');
+                        setDeliveryDate('');
+                        return;
+                      }
+                      setError('');
+                      setDeliveryDate(selected);
+                    }}
                     className="w-full pl-10 pr-4 py-3 bg-slate-800/90 border border-white/15 text-white rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm font-medium"
                   />
                 </div>
+                <p className="text-[11px] text-gray-400 mt-1.5">
+                  Earliest available delivery date is tomorrow (same-day delivery is not supported).
+                </p>
               </div>
 
               {/* Time Window Selector */}
@@ -790,10 +819,14 @@ export default function Checkout() {
               <div className="flex justify-between text-gray-300">
                 <span>Delivery Fee {isSubscription && '(Semester)'}</span>
                 <span className="font-semibold text-white">
-                  {isFreeDelivery ? (
+                  {isFreeDelivery && baseDeliveryCost > 0 ? (
                     <span className="line-through text-gray-500 mr-1.5">GH₵ {baseDeliveryCost.toFixed(2)}</span>
                   ) : null}
-                  GH₵ {finalDeliveryCost.toFixed(2)}
+                  {finalDeliveryCost === 0 ? (
+                    <span className="text-emerald-400 font-bold">FREE</span>
+                  ) : (
+                    `GH₵ ${finalDeliveryCost.toFixed(2)}`
+                  )}
                 </span>
               </div>
 
