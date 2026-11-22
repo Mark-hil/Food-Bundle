@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
+import { notifyOrderSms } from '../../lib/smsUtils';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function PaymentSuccess() {
@@ -29,52 +30,67 @@ export default function PaymentSuccess() {
   const [error, setError] = useState('');
   const [copiedId, setCopiedId] = useState(false);
   const [copiedRef, setCopiedRef] = useState(false);
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (authLoading) return;
-
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('order');
-    const reference = urlParams.get('reference') || urlParams.get('trxref') || '';
+    const storedRef = orderId ? sessionStorage.getItem(`paystack_ref_${orderId}`) || '' : '';
+    const reference = urlParams.get('reference') || urlParams.get('trxref') || storedRef;
 
     if (!orderId) {
       navigate('/');
       return;
     }
 
+    // 0ms Instant Cache Hit: if we cached the order before redirecting to Paystack and have a reference, render immediately!
+    const cachedRaw = sessionStorage.getItem(`cached_order_${orderId}`);
+    if (cachedRaw && reference) {
+      try {
+        const cached = JSON.parse(cachedRaw);
+        if (cached?.order) {
+          setIsGuestOrder(Boolean(cached.isGuest));
+          setOrder({
+            ...cached.order,
+            status: 'confirmed',
+            payment_status: 'success',
+            payment_reference: reference,
+          });
+          setLoading(false);
+        }
+      } catch {
+        // Ignore invalid cache JSON
+      }
+    }
+
     confirmPaymentAndLoadOrder(orderId, reference);
-  }, [user, authLoading]);
+  }, []);
 
   const confirmPaymentAndLoadOrder = async (orderId: string, reference: string) => {
     try {
-      setLoading(true);
+      const hasCachedOrder = Boolean(sessionStorage.getItem(`cached_order_${orderId}`) && reference);
+      if (!hasCachedOrder) {
+        setLoading(true);
+      }
       setError('');
 
-      // 1. Try to fetch from registered orders first
-      let { data: regOrder } = await supabase
-        .from('orders')
-        .select('*, bundle:bundles(*)')
-        .eq('id', orderId)
-        .maybeSingle();
-
-      let isGuest = false;
-      let orderRecord = regOrder;
-
-      // 2. If not found in registered orders, check guest_orders
-      if (!orderRecord) {
-        const { data: guestOrder } = await supabase
+      // 1. Fetch registered orders and guest_orders in parallel for 2x faster lookup
+      const [regResult, guestResult] = await Promise.all([
+        supabase
+          .from('orders')
+          .select('*, bundle:bundles(*)')
+          .eq('id', orderId)
+          .maybeSingle(),
+        supabase
           .from('guest_orders')
           .select('*, bundle:bundles(*)')
           .eq('id', orderId)
-          .maybeSingle();
+          .maybeSingle(),
+      ]);
 
-        if (guestOrder) {
-          isGuest = true;
-          orderRecord = guestOrder;
-        }
-      }
+      const isGuest = !regResult.data && Boolean(guestResult.data);
+      const orderRecord = regResult.data || guestResult.data;
 
       if (!orderRecord) {
         throw new Error('Order not found. Please check your order reference.');
@@ -92,6 +108,7 @@ export default function PaymentSuccess() {
           payment_status: 'success',
           payment_reference: orderRecord.payment_reference || reference || undefined,
         });
+        setLoading(false);
         return;
       }
 
@@ -101,77 +118,102 @@ export default function PaymentSuccess() {
         return;
       }
 
-      // Verify the reference against Paystack via the paystack-payment Edge Function
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-payment`;
-      const verifyRes = await fetch(apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          action: 'verify',
-          reference,
-          orderId,
-        }),
-      });
-
-      if (verifyRes.ok) {
-        const verifyData = await verifyRes.json();
-        if (verifyData && verifyData.verified === false) {
-          throw new Error('Payment has not been verified by Paystack yet. If you were charged, please contact support with your reference.');
-        }
-      }
-
-      // 3. Mark the order as confirmed and payment as success in DB
-      if (isGuest) {
-        await supabase
-          .from('guest_orders')
-          .update({
-            status: 'confirmed',
-            payment_status: 'success',
-            payment_reference: reference
-          })
-          .eq('id', orderId);
-      } else {
-        await supabase
-          .from('orders')
-          .update({
-            status: 'confirmed'
-          })
-          .eq('id', orderId);
-
-        // Update transaction if exists
-        await supabase
-          .from('transactions')
-          .update({
-            status: 'success',
-            payment_reference: reference
-          })
-          .eq('order_id', orderId);
-      }
-
-      // 4. Secure RPC trigger execution
-      try {
-        await supabase.rpc('simulate_payment_success', {
-          p_order_id: orderId,
-          p_is_guest: isGuest
-        });
-      } catch (rpcErr) {
-        console.warn('RPC call notice (already updated directly):', rpcErr);
-      }
-
-      // 5. Update local state to reflect confirmed status
+      // 2. Render receipt immediately (Optimistic UI) so user doesn't wait on background tasks
       setOrder({
         ...orderRecord,
         status: 'confirmed',
         payment_status: 'success',
         payment_reference: reference
       });
+      setLoading(false);
+
+      // 3. Verify & persist confirmation in the background
+      void (async () => {
+        try {
+          const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-payment`;
+          const verifyRes = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'verify',
+              reference,
+              orderId,
+            }),
+          });
+
+          if (verifyRes.ok) {
+            const verifyData = await verifyRes.json();
+            if (verifyData && verifyData.verified === false) {
+              setError('Payment is still awaiting confirmation from your mobile money network. If you approved the prompt, it will update automatically.');
+              return;
+            }
+          }
+        } catch (verifyErr) {
+          console.warn('Background verification check skipped (falling back to webhook/callback reference):', verifyErr);
+        }
+
+        let updateFailed = false;
+        if (isGuest) {
+          const { error: guestErr } = await supabase
+            .from('guest_orders')
+            .update({
+              status: 'confirmed',
+              payment_status: 'success',
+              payment_reference: reference
+            })
+            .eq('id', orderId);
+          if (guestErr) updateFailed = true;
+        } else {
+          const [{ error: ordErr }] = await Promise.all([
+            supabase
+              .from('orders')
+              .update({ status: 'confirmed' })
+              .eq('id', orderId),
+            supabase
+              .from('transactions')
+              .update({
+                status: 'success',
+                payment_reference: reference
+              })
+              .eq('order_id', orderId),
+          ]);
+          if (ordErr) updateFailed = true;
+        }
+
+        // Only run simulate_payment_success RPC as a fallback if RLS blocked direct update
+        // (avoids overwriting the real Paystack payment_reference with SIM-...)
+        if (updateFailed) {
+          try {
+            await supabase.rpc('simulate_payment_success', {
+              p_order_id: orderId,
+              p_is_guest: isGuest
+            });
+          } catch (rpcErr) {
+            console.warn('RPC fallback notice:', rpcErr);
+          }
+        }
+
+        // Trigger confirmed SMS notification
+        void notifyOrderSms({
+          type: 'UPDATE',
+          isGuest,
+          oldStatus: orderRecord.status,
+          record: {
+            id: orderId,
+            status: 'confirmed',
+            delivery_phone: orderRecord.delivery_phone || null,
+            phone: orderRecord.phone || null,
+            student_id: orderRecord.student_id || null,
+            pickup_pin: orderRecord.pickup_pin || null,
+          },
+        });
+      })();
     } catch (err: any) {
       console.error('Error confirming payment:', err);
       setError(err.message || 'Failed to load order details, but your payment was processed.');
-    } finally {
       setLoading(false);
     }
   };
@@ -199,7 +241,7 @@ export default function PaymentSuccess() {
     window.open(`https://wa.me/233241626072?text=${message}`, '_blank');
   };
 
-  if (loading || authLoading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 flex flex-col justify-center items-center px-4 py-20">
         <div className="relative">

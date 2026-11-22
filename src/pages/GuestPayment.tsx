@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useNavigate, Link } from '../lib/navigation';
-import { CreditCard, CheckCircle, AlertCircle, ArrowRight, RotateCcw, Mail } from 'lucide-react';
+import { CreditCard, CheckCircle, AlertCircle, ArrowRight, RotateCcw, Mail, Smartphone } from 'lucide-react';
 
 export default function GuestPayment() {
   const [order, setOrder] = useState<any>(null);
@@ -10,17 +10,42 @@ export default function GuestPayment() {
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const [customEmail, setCustomEmail] = useState('');
+  const [pendingRef, setPendingRef] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('order');
     if (orderId) {
+      const savedRef = sessionStorage.getItem(`paystack_ref_${orderId}`) || '';
+      if (savedRef) setPendingRef(savedRef);
       loadOrder(orderId);
     } else {
       navigate('/bundles');
     }
   }, []);
+
+  // Realtime listener: if webhook confirms guest order while user is waiting, redirect immediately
+  useEffect(() => {
+    if (!order?.id) return;
+    const channel = supabase
+      .channel(`guest-order-pay-${order.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'guest_orders', filter: `id=eq.${order.id}` },
+        (payload: any) => {
+          if (payload.new && (payload.new.status !== 'pending' || payload.new.payment_status === 'success')) {
+            const ref = payload.new.payment_reference || sessionStorage.getItem(`paystack_ref_${order.id}`) || '';
+            navigate(`/payment/success?order=${order.id}${ref ? `&reference=${encodeURIComponent(ref)}` : ''}`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order?.id]);
 
   const loadOrder = async (orderId: string) => {
     try {
@@ -36,6 +61,10 @@ export default function GuestPayment() {
       if (error) throw error;
       if (!data) {
         navigate('/bundles');
+        return;
+      }
+      if (data.status !== 'pending' || data.payment_status === 'success') {
+        navigate(`/payment/success?order=${data.id}${data.payment_reference ? `&reference=${encodeURIComponent(data.payment_reference)}` : ''}`);
         return;
       }
       setOrder(data);
@@ -57,14 +86,14 @@ export default function GuestPayment() {
     setPaymentStatus('idle');
     setErrorMessage('');
 
+    const cleanPhone = (order.phone || '').replace(/[^0-9]/g, '');
+    const rawEmail = customEmail.trim() || order.email?.trim() || '';
+    const emailToSend = (rawEmail && rawEmail.includes('@') && rawEmail.includes('.'))
+      ? rawEmail
+      : `${cleanPhone || 'guest' + Date.now()}@guest.food-bundle.com`;
+
     try {
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-payment`;
-
-      const cleanPhone = (order.phone || '').replace(/[^0-9]/g, '');
-      const rawEmail = customEmail.trim() || order.email?.trim() || '';
-      const emailToSend = (rawEmail && rawEmail.includes('@') && rawEmail.includes('.'))
-        ? rawEmail
-        : `${cleanPhone || 'guest' + Date.now()}@guest.food-bundle.com`;
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -81,6 +110,16 @@ export default function GuestPayment() {
       });
 
       const data = await response.json();
+
+      if (data.reference) {
+        sessionStorage.setItem(`paystack_ref_${order.id}`, data.reference);
+        setPendingRef(data.reference);
+      }
+
+      sessionStorage.setItem(
+        `cached_order_${order.id}`,
+        JSON.stringify({ order, isGuest: true })
+      );
 
       if (data.authorization_url) {
         window.location.href = data.authorization_url;
@@ -232,6 +271,19 @@ export default function GuestPayment() {
               </div>
 
               <div className="space-y-4">
+                <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-xs text-gray-300 space-y-1.5">
+                  <div className="flex items-center gap-2 font-bold text-emerald-400 text-sm">
+                    <Smartphone className="w-4 h-4" />
+                    <span>Fast Mobile Money Approval Tip (Avoid Delays)</span>
+                  </div>
+                  <p>
+                    • <strong>MTN MoMo:</strong> If the PIN pop-up delays after entering your number on Paystack, dial <code className="bg-black/40 text-emerald-300 px-1.5 py-0.5 rounded font-mono">*170#</code> → <strong>6 (My Wallet)</strong> → <strong>3 (My Approvals)</strong> to approve immediately, then tap <em>"I have made this payment"</em>.
+                  </p>
+                  <p>
+                    • <strong>Telecel / AT Money:</strong> Approve the prompt on your phone, then tap <em>"I have made this payment"</em>.
+                  </p>
+                </div>
+
                 <button
                   onClick={initiatePayment}
                   disabled={processing}
@@ -246,6 +298,17 @@ export default function GuestPayment() {
                     <span>Pay with Paystack • GH₵ {Number(order.total_amount).toFixed(2)}</span>
                   )}
                 </button>
+
+                {pendingRef && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/payment/success?order=${order.id}&reference=${encodeURIComponent(pendingRef)}`)}
+                    className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-emerald-300 font-semibold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    <span>Already approved MoMo on your phone? Click here to view receipt</span>
+                  </button>
+                )}
               </div>
             </div>
           </>

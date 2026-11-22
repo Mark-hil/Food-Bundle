@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '../lib/navigation';
-import { CreditCard, CheckCircle, AlertCircle } from 'lucide-react';
+import { CreditCard, CheckCircle, AlertCircle, Smartphone } from 'lucide-react';
 
 export default function Payment() {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [pendingRef, setPendingRef] = useState<string>('');
   const { user, profile } = useAuth();
   const navigate = useNavigate();
 
@@ -16,11 +17,35 @@ export default function Payment() {
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('order');
     if (orderId) {
+      const savedRef = sessionStorage.getItem(`paystack_ref_${orderId}`) || '';
+      if (savedRef) setPendingRef(savedRef);
       loadOrder(orderId);
     } else {
       navigate('/');
     }
   }, []);
+
+  // Realtime listener: if webhook confirms order while user is waiting, redirect immediately
+  useEffect(() => {
+    if (!order?.id) return;
+    const channel = supabase
+      .channel(`order-pay-${order.id}`)
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${order.id}` },
+        (payload: any) => {
+          if (payload.new && payload.new.status !== 'pending') {
+            const ref = sessionStorage.getItem(`paystack_ref_${order.id}`) || '';
+            navigate(`/payment/success?order=${order.id}${ref ? `&reference=${encodeURIComponent(ref)}` : ''}`);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order?.id]);
 
   const loadOrder = async (orderId: string) => {
     try {
@@ -37,6 +62,10 @@ export default function Payment() {
       if (error) throw error;
       if (!data) {
         navigate('/orders');
+        return;
+      }
+      if (data.status !== 'pending') {
+        navigate(`/payment/success?order=${data.id}`);
         return;
       }
       setOrder(data);
@@ -71,6 +100,16 @@ export default function Payment() {
       });
 
       const data = await response.json();
+
+      if (data.reference) {
+        sessionStorage.setItem(`paystack_ref_${order.id}`, data.reference);
+        setPendingRef(data.reference);
+      }
+
+      sessionStorage.setItem(
+        `cached_order_${order.id}`,
+        JSON.stringify({ order, isGuest: false })
+      );
 
       if (data.authorization_url) {
         window.location.href = data.authorization_url;
@@ -158,7 +197,20 @@ export default function Payment() {
           <h2 className="text-xl font-bold text-white">Payment Method</h2>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-4">
+          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 text-xs text-gray-300 space-y-1.5">
+            <div className="flex items-center gap-2 font-bold text-emerald-400 text-sm">
+              <Smartphone className="w-4 h-4" />
+              <span>Fast Mobile Money Approval Tip (Avoid Delays)</span>
+            </div>
+            <p>
+              • <strong>MTN MoMo:</strong> If the PIN pop-up delays after entering your number on Paystack, dial <code className="bg-black/40 text-emerald-300 px-1.5 py-0.5 rounded font-mono">*170#</code> → <strong>6 (My Wallet)</strong> → <strong>3 (My Approvals)</strong> to approve immediately, then tap <em>"I have made this payment"</em>.
+            </p>
+            <p>
+              • <strong>Telecel / AT Money:</strong> Approve the prompt on your phone, then tap <em>"I have made this payment"</em>.
+            </p>
+          </div>
+
           <button
             onClick={initiatePayment}
             disabled={processing || paymentStatus === 'success'}
@@ -167,14 +219,23 @@ export default function Payment() {
             {processing ? (
               <>
                 <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                <span>Processing...</span>
+                <span>Opening Paystack...</span>
               </>
             ) : (
-              <span>Pay with Paystack</span>
+              <span>Pay with Paystack (MoMo / Card)</span>
             )}
           </button>
 
-
+          {pendingRef && (
+            <button
+              type="button"
+              onClick={() => navigate(`/payment/success?order=${order.id}&reference=${encodeURIComponent(pendingRef)}`)}
+              className="w-full bg-white/10 hover:bg-white/20 border border-white/20 text-emerald-300 font-semibold py-3 px-4 rounded-xl text-sm transition flex items-center justify-center gap-2"
+            >
+              <CheckCircle className="w-4 h-4" />
+              <span>Already approved MoMo on your phone? Click here to view receipt</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

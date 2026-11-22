@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { notifyOrderSms } from '../lib/smsUtils';
 import { useNavigate, Link } from '../lib/navigation';
 import { 
   ArrowLeft, 
@@ -234,6 +235,17 @@ export default function GuestCheckout() {
         .single();
 
       if (orderError) throw orderError;
+
+      void notifyOrderSms({
+        type: 'INSERT',
+        isGuest: true,
+        record: {
+          id: orderData.id,
+          status: 'pending',
+          phone: orderData.phone,
+          pickup_pin: orderData.pickup_pin,
+        },
+      });
 
       navigate(`/guest-payment?order=${orderData.id}`);
     } catch (error: any) {

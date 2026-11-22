@@ -66,7 +66,8 @@ function AppContent() {
   const { user, loading, isAdmin, isDriver, isSupport, isPacker, isRecoveringPassword } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  // Do not block /payment/success on AuthContext profile loading so Paystack return is instant
+  if (loading && !location.pathname.startsWith('/payment/success')) {
     return <LoadingSpinner />;
   }
 

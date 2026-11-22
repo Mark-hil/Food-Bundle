@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { notifyOrderSms } from '../../lib/smsUtils';
 import { 
   Package, 
   Truck, 
@@ -357,12 +358,27 @@ export default function DriverDashboard() {
   const startDelivery = async (orderId: string) => {
     try {
       setActionLoading(orderId);
+      const targetOrder = myOrders.find((o: any) => o.id === orderId);
       const { error } = await supabase
         .from('orders')
         .update({ status: 'out_for_delivery' })
         .eq('id', orderId);
 
       if (error) throw error;
+      if (targetOrder) {
+        void notifyOrderSms({
+          type: 'UPDATE',
+          isGuest: false,
+          oldStatus: targetOrder.status,
+          record: {
+            id: orderId,
+            status: 'out_for_delivery',
+            delivery_phone: targetOrder.delivery_phone || targetOrder.profiles?.phone || null,
+            student_id: targetOrder.student_id || null,
+            pickup_pin: targetOrder.pickup_pin || null,
+          },
+        });
+      }
       await fetchOrders();
     } catch (err: any) {
       setError(err.message);
@@ -397,6 +413,7 @@ export default function DriverDashboard() {
     try {
       setActionLoading(orderId);
       setPinError('');
+      const targetOrder = myOrders.find((o: any) => o.id === orderId);
       const { error } = await supabase
         .from('orders')
         .update({ status: 'delivered' })
@@ -404,6 +421,20 @@ export default function DriverDashboard() {
         .eq('pickup_pin', deliveryPin); // Extra safety check
 
       if (error) throw error;
+      if (targetOrder) {
+        void notifyOrderSms({
+          type: 'UPDATE',
+          isGuest: false,
+          oldStatus: targetOrder.status,
+          record: {
+            id: orderId,
+            status: 'delivered',
+            delivery_phone: targetOrder.delivery_phone || targetOrder.profiles?.phone || null,
+            student_id: targetOrder.student_id || null,
+            pickup_pin: targetOrder.pickup_pin || null,
+          },
+        });
+      }
       
       setVerifyingOrder(null);
       setDeliveryPin('');

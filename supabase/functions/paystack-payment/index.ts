@@ -107,6 +107,8 @@ Deno.serve(async (req: Request) => {
         body: JSON.stringify({
           email,
           amount: amountInKobo,
+          currency: "GHS",
+          channels: ["mobile_money", "card"],
           reference: `ORDER-${orderId}-${Date.now()}`,
           callback_url: `${req.headers.get("origin")}/payment/success?order=${orderId}`,
           metadata: {

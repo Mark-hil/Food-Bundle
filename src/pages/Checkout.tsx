@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase, Bundle } from '../lib/supabase';
+import { notifyOrderSms } from '../lib/smsUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from '../lib/navigation';
 import { 
@@ -71,7 +72,7 @@ export default function Checkout() {
   const [roomOrLandmark, setRoomOrLandmark] = useState<string>('');
   const [isCustomAddress, setIsCustomAddress] = useState<boolean>(false);
 
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -394,6 +395,7 @@ export default function Checkout() {
 
       const pointsEarned = Math.floor(totalAmount / loyaltyEarnStepAmount) * loyaltyEarnStepPoints;
 
+      const pickupPin = Math.floor(1000 + Math.random() * 9000).toString();
       const { data: orderId, error: rpcError } = await supabase.rpc('place_order', {
         p_student_id: user.id,
         p_bundle_id: bundle.id,
@@ -403,9 +405,9 @@ export default function Checkout() {
         p_delivery_time: deliveryTime || null,
         p_delivery_date: deliveryDate || null,
         p_notes: isSubscription ? `[SEMESTER SUBSCRIPTION: Delivery 1 of 3] ${notes}`.trim() : (notes || null),
-        p_pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(),
+        p_pickup_pin: pickupPin,
         p_custom_items: customItems.length > 0 ? customItems : null,
-        p_delivery_phone: deliveryPhone || null,
+        p_delivery_phone: deliveryPhone || profile?.phone || null,
         p_total_amount: totalAmount,
         p_delivery_fee: finalDeliveryCost,
         p_use_points: usePoints,
@@ -414,6 +416,18 @@ export default function Checkout() {
       });
 
       if (rpcError) throw rpcError;
+
+      void notifyOrderSms({
+        type: 'INSERT',
+        isGuest: false,
+        record: {
+          id: orderId,
+          status: 'pending',
+          delivery_phone: deliveryPhone || profile?.phone || null,
+          student_id: user.id,
+          pickup_pin: pickupPin,
+        },
+      });
 
       navigate(`/payment?order=${orderId}`);
     } catch (error) {

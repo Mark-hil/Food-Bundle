@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from '../../lib/navigation';
 import { supabase } from '../../lib/supabase';
+import { notifyOrderSms } from '../../lib/smsUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { Search, X, Loader, Lock, CheckCircle2, ChevronLeft, ChevronRight, Phone, Headset, PackageCheck, Eye } from 'lucide-react';
 
@@ -164,12 +165,30 @@ export default function AdminOrders() {
         updatePayload.driver_id = null;
       }
 
+      const existingOrder = orders.find(o => o.id === orderId);
       const { error } = await supabase
         .from(table)
         .update(updatePayload)
         .eq('id', orderId);
 
       if (error) throw error;
+
+      if (existingOrder) {
+        void notifyOrderSms({
+          type: 'UPDATE',
+          isGuest: source === 'guest',
+          oldStatus: existingOrder.status,
+          record: {
+            id: orderId,
+            status: newStatus,
+            delivery_phone: existingOrder.delivery_phone || existingOrder.student?.phone || null,
+            phone: existingOrder.phone || existingOrder.student?.phone || null,
+            student_id: existingOrder.student_id || null,
+            pickup_pin: existingOrder.pickup_pin || null,
+          },
+        });
+      }
+
       loadOrders();
     } catch (error) {
       console.error('Error updating order:', error);

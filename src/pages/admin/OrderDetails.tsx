@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from '../../lib/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
+import { notifyOrderSms } from '../../lib/smsUtils';
 import { ArrowLeft, Clock, MapPin, Phone, Mail, DollarSign, Package, Calendar, User, Headset, PackageCheck, CheckCircle, Truck, Check } from 'lucide-react';
 
 export default function AdminOrderDetails() {
@@ -99,6 +100,7 @@ export default function AdminOrderDetails() {
         updatePayload.driver_id = null;
       }
 
+      const oldStatus = order?.status;
       const { error: updateError } = await supabase
         .from(table)
         .update(updatePayload)
@@ -106,6 +108,22 @@ export default function AdminOrderDetails() {
 
       if (updateError) throw updateError;
       setOrder({ ...order, ...updatePayload });
+
+      if (orderId) {
+        void notifyOrderSms({
+          type: 'UPDATE',
+          isGuest: Boolean(order?.is_guest),
+          oldStatus,
+          record: {
+            id: orderId,
+            status: newStatus,
+            delivery_phone: order?.delivery_phone || order?.student?.phone || null,
+            phone: order?.phone || order?.student?.phone || null,
+            student_id: order?.student_id || null,
+            pickup_pin: order?.pickup_pin || null,
+          },
+        });
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {
