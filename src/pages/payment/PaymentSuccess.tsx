@@ -37,7 +37,7 @@ export default function PaymentSuccess() {
 
     const urlParams = new URLSearchParams(window.location.search);
     const orderId = urlParams.get('order');
-    const reference = urlParams.get('reference') || urlParams.get('trxref') || `PAY-${Date.now()}`;
+    const reference = urlParams.get('reference') || urlParams.get('trxref') || '';
 
     if (!orderId) {
       navigate('/');
@@ -81,6 +81,47 @@ export default function PaymentSuccess() {
       }
 
       setIsGuestOrder(isGuest);
+
+      const alreadyConfirmed =
+        orderRecord.status !== 'pending' ||
+        (isGuest && orderRecord.payment_status === 'success');
+
+      if (alreadyConfirmed) {
+        setOrder({
+          ...orderRecord,
+          payment_status: 'success',
+          payment_reference: orderRecord.payment_reference || reference || undefined,
+        });
+        return;
+      }
+
+      // Order is still pending: require a real Paystack reference from the callback URL
+      if (!reference) {
+        navigate(isGuest ? `/guest-payment?order=${orderId}` : `/payment?order=${orderId}`);
+        return;
+      }
+
+      // Verify the reference against Paystack via the paystack-payment Edge Function
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/paystack-payment`;
+      const verifyRes = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'verify',
+          reference,
+          orderId,
+        }),
+      });
+
+      if (verifyRes.ok) {
+        const verifyData = await verifyRes.json();
+        if (verifyData && verifyData.verified === false) {
+          throw new Error('Payment has not been verified by Paystack yet. If you were charged, please contact support with your reference.');
+        }
+      }
 
       // 3. Mark the order as confirmed and payment as success in DB
       if (isGuest) {
@@ -155,7 +196,7 @@ export default function PaymentSuccess() {
   const openWhatsAppSupport = () => {
     const orderNum = order?.id ? order.id.slice(0, 8).toUpperCase() : '';
     const message = encodeURIComponent(`Hi Food Bundle Support! I just completed payment for Order #${orderNum}. Please can you confirm my delivery status?`);
-    window.open(`https://wa.me/233500000000?text=${message}`, '_blank');
+    window.open(`https://wa.me/233241626072?text=${message}`, '_blank');
   };
 
   if (loading || authLoading) {

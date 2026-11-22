@@ -1,4 +1,5 @@
 import { Calendar, Zap, CreditCard } from 'lucide-react';
+import { Link } from '../../lib/navigation';
 
 export default function MySubscriptions() {
   const subscriptions = [
@@ -94,9 +95,9 @@ export default function MySubscriptions() {
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold text-slate-900 mb-4">Want to upgrade?</h2>
         <p className="text-slate-600 mb-6">Explore other subscription plans that might suit you better.</p>
-        <a href="/packages" className="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+        <Link to="/bundles" className="inline-block bg-blue-600 text-white px-8 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
           View All Plans
-        </a>
+        </Link>
       </div>
     </div>
   );

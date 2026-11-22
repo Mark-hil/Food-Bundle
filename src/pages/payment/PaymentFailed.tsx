@@ -51,7 +51,7 @@ export default function PaymentFailed() {
           <button className="flex items-center justify-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
             <RotateCcw size={20} /> Try Again
           </button>
-          <a href="mailto:support@studentmeals.com" className="flex items-center justify-center gap-2 bg-slate-100 text-slate-900 px-6 py-3 rounded-lg font-semibold hover:bg-slate-200 transition">
+          <a href="mailto:support@food-bundle.com" className="flex items-center justify-center gap-2 bg-slate-100 text-slate-900 px-6 py-3 rounded-lg font-semibold hover:bg-slate-200 transition">
             Contact Support
           </a>
         </div>

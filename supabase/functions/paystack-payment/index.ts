@@ -7,9 +7,11 @@ const corsHeaders = {
 };
 
 interface PaymentRequest {
-  email: string;
-  amount: number;
-  orderId: string;
+  action?: "initialize" | "verify";
+  email?: string;
+  amount?: number;
+  orderId?: string;
+  reference?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -27,7 +29,57 @@ Deno.serve(async (req: Request) => {
       throw new Error("Paystack secret key not configured");
     }
 
-    const { email, amount, orderId }: PaymentRequest = await req.json();
+    const body: PaymentRequest = await req.json();
+
+    if (body.action === "verify") {
+      if (!body.reference) {
+        return new Response(
+          JSON.stringify({ error: "Missing payment reference" }),
+          {
+            status: 400,
+            headers: {
+              ...corsHeaders,
+              "Content-Type": "application/json",
+            },
+          }
+        );
+      }
+
+      const verifyResponse = await fetch(
+        `https://api.paystack.co/transaction/verify/${encodeURIComponent(body.reference)}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${paystackSecretKey}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      const verifyData = await verifyResponse.json();
+      const isPaid =
+        verifyResponse.ok &&
+        verifyData?.status === true &&
+        verifyData?.data?.status === "success";
+
+      return new Response(
+        JSON.stringify({
+          verified: isPaid,
+          status: verifyData?.data?.status || "failed",
+          reference: verifyData?.data?.reference || body.reference,
+          amount: verifyData?.data?.amount ? verifyData.data.amount / 100 : undefined,
+        }),
+        {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+    }
+
+    const { email, amount, orderId } = body;
 
     if (!email || !amount || !orderId) {
       return new Response(

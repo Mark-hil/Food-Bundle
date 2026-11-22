@@ -39,7 +39,11 @@ export default function Login() {
       setError(error.message);
       setLoading(false);
     } else {
-      if (role === 'admin' || role === 'super_admin') {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get('redirect');
+      if (redirect && redirect.startsWith('/')) {
+        navigate(redirect);
+      } else if (role === 'admin' || role === 'super_admin') {
         navigate('/admin/dashboard');
       } else if (role === 'driver') {
         navigate('/driver/dashboard');

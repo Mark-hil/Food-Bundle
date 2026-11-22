@@ -18,7 +18,7 @@ export default function GuestPayment() {
     if (orderId) {
       loadOrder(orderId);
     } else {
-      navigate('/packages');
+      navigate('/bundles');
     }
   }, []);
 
@@ -35,7 +35,7 @@ export default function GuestPayment() {
 
       if (error) throw error;
       if (!data) {
-        navigate('/packages');
+        navigate('/bundles');
         return;
       }
       setOrder(data);
@@ -44,7 +44,7 @@ export default function GuestPayment() {
       }
     } catch (error) {
       console.error('Error loading order:', error);
-      navigate('/packages');
+      navigate('/bundles');
     } finally {
       setLoading(false);
     }
@@ -123,7 +123,7 @@ export default function GuestPayment() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                to="/packages"
+                to="/bundles"
                 className="inline-flex items-center justify-center gap-2 bg-white/10 text-white px-6 py-3 rounded-lg font-semibold hover:bg-white/20 transition border border-white/20"
               >
                 Back to Packages

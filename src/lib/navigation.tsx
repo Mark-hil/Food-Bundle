@@ -21,7 +21,7 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
 
   const navigate = (path: string) => {
     window.history.pushState({}, '', path);
-    setCurrentPath(path);
+    setCurrentPath(window.location.pathname);
     window.dispatchEvent(new PopStateEvent('popstate'));
   };
 

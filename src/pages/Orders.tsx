@@ -70,6 +70,8 @@ export default function Orders() {
         return 'bg-orange-500/10 text-orange-400 border border-orange-500/20';
       case 'ready':
         return 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20';
+      case 'out_for_delivery':
+        return 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/20';
       default:
         return 'bg-slate-500/10 text-slate-400 border border-slate-500/20';
     }
@@ -114,23 +116,23 @@ export default function Orders() {
                   <div className="flex items-center space-x-3 mb-2">
                     {getStatusIcon(order.status)}
                     <h3 className="text-lg font-bold text-white">
-                      {order.bundle.name}
+                      {order.bundle?.name || 'Food Bundle'}
                     </h3>
                     {order.custom_items && order.custom_items.length > 0 && (
                       <div className="mt-2 p-2 bg-black/20 rounded-lg border border-white/5">
                         <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Modifications</div>
                         <div className="flex flex-wrap gap-1.5">
-                          {order.custom_items.filter(item => !(order.bundle.items || []).includes(item)).map((item, idx) => (
+                          {order.custom_items.filter(item => !(order.bundle?.items || []).includes(item)).map((item, idx) => (
                             <span key={`add-${idx}`} className="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded-md border border-emerald-500/20 flex items-center">
                               <span className="mr-1 font-bold">+</span> {item}
                             </span>
                           ))}
-                          {(order.bundle.items || []).filter(item => !(order.custom_items || []).includes(item)).map((item, idx) => (
+                          {(order.bundle?.items || []).filter(item => !(order.custom_items || []).includes(item)).map((item, idx) => (
                             <span key={`rem-${idx}`} className="text-[10px] bg-red-500/10 text-red-400 px-2 py-0.5 rounded-md border border-red-500/20 flex items-center">
                               <span className="mr-1 font-bold">-</span> <span className="line-through">{item}</span>
                             </span>
                           ))}
-                          {(order.custom_items || []).filter(item => (order.bundle.items || []).includes(item)).map((item, idx) => (
+                          {(order.custom_items || []).filter(item => (order.bundle?.items || []).includes(item)).map((item, idx) => (
                             <span key={`kept-${idx}`} className="text-[10px] bg-slate-500/20 text-slate-400 px-2 py-0.5 rounded-md border border-slate-500/20">
                               {item}
                             </span>
@@ -143,7 +145,7 @@ export default function Orders() {
                         order.status
                       )}`}
                     >
-                      {order.status.toUpperCase()}
+                      {order.status.replace(/_/g, ' ').toUpperCase()}
                     </span>
                   </div>
 
@@ -214,13 +216,15 @@ export default function Orders() {
                         Pay Now
                       </button>
                     )}
-                    <button
-                      onClick={() => navigate(`/checkout?bundle=${order.bundle.id}&reorder=true`)}
-                      className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                      Reorder
-                    </button>
+                    {order.bundle?.id && (
+                      <button
+                        onClick={() => navigate(`/checkout?bundle=${order.bundle.id}&reorder=true`)}
+                        className="bg-gradient-to-r from-blue-500 to-emerald-500 hover:shadow-lg hover:shadow-blue-500/50 text-white font-semibold px-4 py-2 rounded-lg transition flex items-center gap-2 text-sm"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        Reorder
+                      </button>
+                    )}
                     <ReceiptDownload order={order} />
                   </div>
                 </div>

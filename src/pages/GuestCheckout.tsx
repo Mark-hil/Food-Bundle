@@ -66,7 +66,7 @@ export default function GuestCheckout() {
       loadDeliveryZones();
       loadSettings();
     } else {
-      navigate('/packages');
+      navigate('/bundles');
     }
   }, []);
 
@@ -81,13 +81,13 @@ export default function GuestCheckout() {
 
       if (error) throw error;
       if (!data) {
-        navigate('/packages');
+        navigate('/bundles');
         return;
       }
       setBundle(data);
     } catch (error) {
       console.error('Error loading bundle:', error);
-      navigate('/packages');
+      navigate('/bundles');
     } finally {
       setLoading(false);
     }
@@ -265,7 +265,7 @@ export default function GuestCheckout() {
         {/* Top Breadcrumb & Stepper */}
         <div className="mb-8">
           <Link
-            to="/packages"
+            to="/bundles"
             className="inline-flex items-center text-xs font-semibold text-gray-400 hover:text-white mb-4 transition-colors"
           >
             <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />

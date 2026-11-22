@@ -83,6 +83,7 @@ function AppContent() {
     const isPublicPage = [
       '/', 
       '/bundles', 
+      '/packages',
       '/about', 
       '/contact', 
       '/faq', 
@@ -113,7 +114,7 @@ function AppContent() {
             <Footer />
           </>
         )}
-        {location.pathname === '/bundles' && (
+        {(location.pathname === '/bundles' || location.pathname === '/packages') && (
           <>
             <PageTransition><Bundles /></PageTransition>
             <Footer />
@@ -276,7 +277,7 @@ function AppContent() {
   // Render student/user routes with Layout
   return (
     <Layout>
-      {location.pathname === '/' && <Bundles />}
+      {(location.pathname === '/' || location.pathname === '/bundles' || location.pathname === '/packages') && <Bundles />}
       {location.pathname === '/dashboard' && <Overview />}
       {location.pathname === '/dashboard/overview' && <Overview />}
       {location.pathname === '/checkout' && <Checkout />}
@@ -299,6 +300,13 @@ function AppContent() {
       {location.pathname === '/profile/addresses' && <ManageAddresses />}
       {location.pathname === '/profile/notifications' && <NotificationSettings />}
       {location.pathname === '/contact' && <Contact />}
+      {location.pathname === '/about' && <About />}
+      {location.pathname === '/faq' && <FAQ />}
+      {location.pathname === '/terms' && <Terms />}
+      {location.pathname === '/privacy' && <Privacy />}
+      {location.pathname === '/refund-policy' && <RefundPolicy />}
+      {location.pathname.startsWith('/verify-email') && <VerifyEmail />}
+      {(location.pathname === '/login' || location.pathname === '/register') && <Overview />}
       {location.pathname === '/help' && <HelpCenter />}
       {location.pathname === '/support' && <SupportTickets />}
       {location.pathname === '/support/new' && <CreateTicket />}

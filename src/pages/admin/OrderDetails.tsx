@@ -94,8 +94,8 @@ export default function AdminOrderDetails() {
       const table = order?.is_guest ? 'guest_orders' : 'orders';
       const updatePayload: Record<string, any> = { status: newStatus };
       
-      // If moving back to preparing/confirmed/pending, unassign any claimed driver (only for regular orders)
-      if (!order?.is_guest && ['pending', 'confirmed', 'preparing'].includes(newStatus)) {
+      // If moving back to preparing/confirmed/pending, unassign any claimed driver
+      if (['pending', 'confirmed', 'preparing'].includes(newStatus)) {
         updatePayload.driver_id = null;
       }
 

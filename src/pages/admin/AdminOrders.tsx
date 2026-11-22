@@ -106,10 +106,6 @@ export default function AdminOrders() {
           `)
           .order('created_at', { ascending: false });
 
-        if (filter !== 'all') {
-          query = query.eq('status', filter);
-        }
-
         if (tab === 'subscriptions') {
           query = query.ilike('notes', '%[SEMESTER SUBSCRIPTION%');
         }
@@ -126,17 +122,13 @@ export default function AdminOrders() {
       }
 
       if (tab === 'all' || tab === 'guest') {
-        let guestQuery = supabase
+        const guestQuery = supabase
           .from('guest_orders')
           .select(`
             *,
             bundle:bundles(name, items)
           `)
           .order('created_at', { ascending: false });
-
-        if (filter !== 'all') {
-          guestQuery = guestQuery.eq('status', filter);
-        }
 
         const { data, error } = await guestQuery;
         if (error) throw error;
@@ -168,7 +160,7 @@ export default function AdminOrders() {
     try {
       const table = source === 'guest' ? 'guest_orders' : 'orders';
       const updatePayload: Record<string, any> = { status: newStatus };
-      if (source !== 'guest' && ['pending', 'confirmed', 'preparing'].includes(newStatus)) {
+      if (['pending', 'confirmed', 'preparing'].includes(newStatus)) {
         updatePayload.driver_id = null;
       }
 
@@ -213,9 +205,9 @@ export default function AdminOrders() {
     if (isSupport || isPacker) return;
     if (quickPin.length !== 4) return;
     
-    // Find order with matching PIN that is ready
+    // Find order with matching PIN that is ready or out for delivery
     const matchingOrder = orders.find(
-      (o) => o.pickup_pin === quickPin && o.status === 'ready'
+      (o) => o.pickup_pin === quickPin && (o.status === 'ready' || o.status === 'out_for_delivery')
     );
 
     if (matchingOrder) {
@@ -296,6 +288,7 @@ export default function AdminOrders() {
     { value: 'confirmed', label: 'Confirmed', count: orders.filter(o => o.status === 'confirmed').length },
     { value: 'preparing', label: 'Preparing', count: orders.filter(o => o.status === 'preparing').length },
     { value: 'ready', label: 'Ready', count: orders.filter(o => o.status === 'ready').length },
+    { value: 'out_for_delivery', label: 'In Transit', count: orders.filter(o => o.status === 'out_for_delivery').length },
     { value: 'delivered', label: 'Delivered', count: orders.filter(o => o.status === 'delivered').length },
     { value: 'cancelled', label: 'Cancelled', count: orders.filter(o => o.status === 'cancelled').length },
   ];
@@ -310,6 +303,8 @@ export default function AdminOrders() {
         return 'bg-purple-50 text-purple-800 border-purple-200';
       case 'ready':
         return 'bg-teal-50 text-teal-800 border-teal-200';
+      case 'out_for_delivery':
+        return 'bg-indigo-50 text-indigo-800 border-indigo-200';
       case 'delivered':
         return 'bg-green-50 text-green-800 border-green-200';
       case 'cancelled':
@@ -335,6 +330,7 @@ export default function AdminOrders() {
   };
 
   const filteredOrders = orders.filter(order => {
+    if (filter !== 'all' && order.status !== filter) return false;
     const searchLower = searchQuery.toLowerCase();
     const searchId = searchLower.replace(/^#/, '');
     const customerName = getCustomerName(order).toLowerCase();

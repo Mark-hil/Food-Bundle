@@ -17,12 +17,13 @@ interface OrderData extends Order {
   bundle?: Bundle;
 }
 
-const STATUS_FLOW = ['pending', 'confirmed', 'preparing', 'ready', 'delivered'];
+const STATUS_FLOW = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'];
 const STATUS_LABELS: Record<string, string> = {
   pending: 'Order Pending',
   confirmed: 'Order Confirmed',
   preparing: 'Preparing Order',
   ready: 'Ready for Pickup',
+  out_for_delivery: 'Out for Delivery',
   delivered: 'Delivered',
   cancelled: 'Order Cancelled',
 };
@@ -59,6 +60,7 @@ export default function TrackDelivery() {
           confirmed: 36,
           preparing: 6,
           ready: 1,
+          out_for_delivery: 0.5,
         };
         targetDate = new Date(createdAt.getTime() + (estimatedHours[order.status] || 48) * 60 * 60 * 1000);
       }
@@ -366,7 +368,7 @@ export default function TrackDelivery() {
               </div>
             )}
             
-            {order.status === 'ready' && (
+            {(order.status === 'ready' || order.status === 'out_for_delivery') && (
               <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-6 flex flex-col justify-center items-center text-center">
                 <p className="text-emerald-400 font-semibold mb-3">Have you received your order?</p>
                 <button
