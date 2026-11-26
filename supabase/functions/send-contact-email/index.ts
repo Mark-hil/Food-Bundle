@@ -5,6 +5,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function escapeHtml(value: string): string {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -18,6 +27,10 @@ serve(async (req) => {
     if (!name || !email || !message) {
       throw new Error("Missing required fields: name, email, message");
     }
+
+    const safeName = escapeHtml(name);
+    const safeEmail = escapeHtml(email);
+    const safeMessage = escapeHtml(message);
 
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     
@@ -36,7 +49,7 @@ serve(async (req) => {
         from: 'Food Bundle <noreply@food-bundle.com>',
         to: ['support@food-bundle.com'],
         reply_to: email,
-        subject: `Support Request: ${name}`,
+        subject: `Support Request: ${safeName}`,
         html: `
           <!DOCTYPE html>
           <html>
@@ -68,17 +81,17 @@ serve(async (req) => {
                 <div class="info-grid">
                   <div class="info-row">
                     <div class="label">Customer Name</div>
-                    <div class="value">${name}</div>
+                    <div class="value">${safeName}</div>
                   </div>
                   <div class="info-row">
                     <div class="label">Email Address</div>
-                    <div class="value"><a href="mailto:${email}" style="color: #2563eb; text-decoration: none;">${email}</a></div>
+                    <div class="value"><a href="mailto:${safeEmail}" style="color: #2563eb; text-decoration: none;">${safeEmail}</a></div>
                   </div>
                 </div>
                 <div class="message-section">
                   <div class="label" style="color: #0f172a;">Message from Customer</div>
                   <div class="message-box">
-                    <p class="message-content">${message}</p>
+                    <p class="message-content">${safeMessage}</p>
                   </div>
                 </div>
               </div>

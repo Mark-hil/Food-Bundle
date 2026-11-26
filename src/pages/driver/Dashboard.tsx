@@ -54,7 +54,7 @@ export default function DriverDashboard() {
     
     fetchOrders();
 
-    // Set up Realtime live updates for driver orders
+    // Set up Realtime live updates for driver orders (registered + guest)
     const ordersChannel = supabase
       .channel('driver-orders-live-sync')
       .on(
@@ -68,12 +68,33 @@ export default function DriverDashboard() {
           fetchOrders();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'guest_orders',
+        },
+        () => {
+          fetchOrders();
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(ordersChannel);
     };
   }, [user]);
+
+  const mapGuestOrderForDriver = (o: any) => ({
+    ...o,
+    is_guest: true,
+    profiles: {
+      full_name: o.full_name || 'Guest Customer',
+      phone: o.phone,
+      student_id: 'GUEST',
+    },
+  });
 
   const fetchOrders = async () => {
     try {
@@ -102,50 +123,89 @@ export default function DriverDashboard() {
         // Default to GH₵ 10.00 base, 90% payout, GH₵ 5.00 batch bonus
       }
 
-      // Fetch available orders
-      const { data: availableData, error: availableError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          bundles (name, image_url),
-          profiles!orders_student_id_fkey (full_name, phone, student_id)
-        `)
-        .eq('status', 'ready')
-        .is('driver_id', null)
-        .order('created_at', { ascending: false });
+      // Fetch available orders (registered + guest)
+      const [regAvailRes, guestAvailRes, regMyRes, guestMyRes, regDelRes, guestDelRes] = await Promise.all([
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            bundles (name, image_url),
+            profiles!orders_student_id_fkey (full_name, phone, student_id)
+          `)
+          .eq('status', 'ready')
+          .is('driver_id', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('guest_orders')
+          .select(`
+            *,
+            bundles (name, image_url)
+          `)
+          .eq('status', 'ready')
+          .is('driver_id', null)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            bundles (name, image_url),
+            profiles!orders_student_id_fkey (full_name, phone, student_id)
+          `)
+          .eq('driver_id', user?.id)
+          .in('status', ['ready', 'out_for_delivery'])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('guest_orders')
+          .select(`
+            *,
+            bundles (name, image_url)
+          `)
+          .eq('driver_id', user?.id)
+          .in('status', ['ready', 'out_for_delivery'])
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select(`
+            *,
+            bundles (name, image_url),
+            profiles!orders_student_id_fkey (full_name, phone, student_id)
+          `)
+          .eq('driver_id', user?.id)
+          .eq('status', 'delivered')
+          .order('updated_at', { ascending: false }),
+        supabase
+          .from('guest_orders')
+          .select(`
+            *,
+            bundles (name, image_url)
+          `)
+          .eq('driver_id', user?.id)
+          .eq('status', 'delivered')
+          .order('updated_at', { ascending: false }),
+      ]);
 
-      if (availableError) throw availableError;
-      setAvailableOrders(availableData || []);
+      if (regAvailRes.error) throw regAvailRes.error;
+      if (regMyRes.error) throw regMyRes.error;
+      if (regDelRes.error) throw regDelRes.error;
 
-      // Fetch my active route orders
-      const { data: myData, error: myError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          bundles (name, image_url),
-          profiles!orders_student_id_fkey (full_name, phone, student_id)
-        `)
-        .eq('driver_id', user?.id)
-        .in('status', ['ready', 'out_for_delivery'])
-        .order('created_at', { ascending: false });
+      const combinedAvailable = [
+        ...(regAvailRes.data || []).map((o: any) => ({ ...o, is_guest: false })),
+        ...(guestAvailRes.data || []).map(mapGuestOrderForDriver),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      if (myError) throw myError;
-      setMyOrders(myData || []);
+      const combinedMine = [
+        ...(regMyRes.data || []).map((o: any) => ({ ...o, is_guest: false })),
+        ...(guestMyRes.data || []).map(mapGuestOrderForDriver),
+      ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-      // Fetch my completed delivered orders for analytics and history
-      const { data: deliveredData, error: deliveredError } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          bundles (name, image_url),
-          profiles!orders_student_id_fkey (full_name, phone, student_id)
-        `)
-        .eq('driver_id', user?.id)
-        .eq('status', 'delivered')
-        .order('updated_at', { ascending: false });
+      const combinedDelivered = [
+        ...(regDelRes.data || []).map((o: any) => ({ ...o, is_guest: false })),
+        ...(guestDelRes.data || []).map(mapGuestOrderForDriver),
+      ].sort((a, b) => new Date(b.updated_at || b.created_at).getTime() - new Date(a.updated_at || a.created_at).getTime());
 
-      if (deliveredError) throw deliveredError;
-      setDeliveredOrders(deliveredData || []);
+      setAvailableOrders(combinedAvailable);
+      setMyOrders(combinedMine);
+      setDeliveredOrders(combinedDelivered);
 
     } catch (err: any) {
       setError(err.message);
@@ -322,8 +382,10 @@ export default function DriverDashboard() {
   const claimOrder = async (orderId: string) => {
     try {
       setActionLoading(orderId);
+      const targetOrder = availableOrders.find((o: any) => o.id === orderId);
+      const table = targetOrder?.is_guest ? 'guest_orders' : 'orders';
       const { error } = await supabase
-        .from('orders')
+        .from(table)
         .update({ driver_id: user?.id })
         .eq('id', orderId);
 
@@ -340,8 +402,10 @@ export default function DriverDashboard() {
   const unclaimOrder = async (orderId: string) => {
     try {
       setActionLoading(orderId);
+      const targetOrder = myOrders.find((o: any) => o.id === orderId);
+      const table = targetOrder?.is_guest ? 'guest_orders' : 'orders';
       const { error } = await supabase
-        .from('orders')
+        .from(table)
         .update({ driver_id: null })
         .eq('id', orderId);
 
@@ -359,8 +423,9 @@ export default function DriverDashboard() {
     try {
       setActionLoading(orderId);
       const targetOrder = myOrders.find((o: any) => o.id === orderId);
+      const table = targetOrder?.is_guest ? 'guest_orders' : 'orders';
       const { error } = await supabase
-        .from('orders')
+        .from(table)
         .update({ status: 'out_for_delivery' })
         .eq('id', orderId);
 
@@ -368,12 +433,13 @@ export default function DriverDashboard() {
       if (targetOrder) {
         void notifyOrderSms({
           type: 'UPDATE',
-          isGuest: false,
+          isGuest: Boolean(targetOrder.is_guest),
           oldStatus: targetOrder.status,
           record: {
             id: orderId,
             status: 'out_for_delivery',
             delivery_phone: targetOrder.delivery_phone || targetOrder.profiles?.phone || null,
+            phone: targetOrder.phone || targetOrder.profiles?.phone || null,
             student_id: targetOrder.student_id || null,
             pickup_pin: targetOrder.pickup_pin || null,
           },
@@ -390,8 +456,10 @@ export default function DriverDashboard() {
   const cancelDeliveryTrip = async (orderId: string) => {
     try {
       setActionLoading(orderId);
+      const targetOrder = myOrders.find((o: any) => o.id === orderId);
+      const table = targetOrder?.is_guest ? 'guest_orders' : 'orders';
       const { error } = await supabase
-        .from('orders')
+        .from(table)
         .update({ status: 'ready' })
         .eq('id', orderId);
 
@@ -414,8 +482,9 @@ export default function DriverDashboard() {
       setActionLoading(orderId);
       setPinError('');
       const targetOrder = myOrders.find((o: any) => o.id === orderId);
+      const table = targetOrder?.is_guest ? 'guest_orders' : 'orders';
       const { error } = await supabase
-        .from('orders')
+        .from(table)
         .update({ status: 'delivered' })
         .eq('id', orderId)
         .eq('pickup_pin', deliveryPin); // Extra safety check
@@ -424,12 +493,13 @@ export default function DriverDashboard() {
       if (targetOrder) {
         void notifyOrderSms({
           type: 'UPDATE',
-          isGuest: false,
+          isGuest: Boolean(targetOrder.is_guest),
           oldStatus: targetOrder.status,
           record: {
             id: orderId,
             status: 'delivered',
             delivery_phone: targetOrder.delivery_phone || targetOrder.profiles?.phone || null,
+            phone: targetOrder.phone || targetOrder.profiles?.phone || null,
             student_id: targetOrder.student_id || null,
             pickup_pin: targetOrder.pickup_pin || null,
           },

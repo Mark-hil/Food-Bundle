@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Building2, Truck, Percent } from 'lucide-react';
+import { Save, Building2, Truck, Percent, Gift } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import DeliveryZonesManager from '../../components/admin/DeliveryZonesManager';
 
@@ -20,6 +20,9 @@ export default function Settings() {
     loyaltyEarnStepPoints: '10',
     loyaltyRedemptionRatio: '100',
     loyaltyMinPointsToRedeem: '500',
+    referralBuyerDiscount: '10.00',
+    referralCommissionPerOrder: '15.00',
+    referralMinPayoutAmount: '45.00',
   });
 
   const [loading, setLoading] = useState(true);
@@ -136,6 +139,9 @@ export default function Settings() {
           loyaltyEarnStepPoints: Number(data.loyalty_earn_step_points || 10).toString(),
           loyaltyRedemptionRatio: Number(data.loyalty_redemption_ratio || 100).toString(),
           loyaltyMinPointsToRedeem: Number(data.loyalty_min_points_to_redeem || 500).toString(),
+          referralBuyerDiscount: Number(data.referral_buyer_discount ?? 10).toFixed(2),
+          referralCommissionPerOrder: Number(data.referral_commission_per_order ?? 15).toFixed(2),
+          referralMinPayoutAmount: Number(data.referral_min_payout_amount ?? 45).toFixed(2),
         });
       }
     } catch (err: any) {
@@ -177,10 +183,22 @@ export default function Settings() {
           loyalty_earn_step_points: Number(settings.loyaltyEarnStepPoints),
           loyalty_redemption_ratio: Number(settings.loyaltyRedemptionRatio),
           loyalty_min_points_to_redeem: Number(settings.loyaltyMinPointsToRedeem),
+          referral_buyer_discount: Number(settings.referralBuyerDiscount),
+          referral_commission_per_order: Number(settings.referralCommissionPerOrder),
+          referral_min_payout_amount: Number(settings.referralMinPayoutAmount),
         })
         .eq('id', 1);
 
       if (error) throw error;
+
+      // Sync existing auto-generated student referral codes to match the updated buyer discount & commission rate
+      await supabase
+        .from('promo_codes')
+        .update({
+          discount_value: Number(settings.referralBuyerDiscount),
+          commission_per_order: Number(settings.referralCommissionPerOrder),
+        })
+        .ilike('description', 'Student Referral Code%');
 
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
@@ -452,6 +470,62 @@ export default function Settings() {
                     className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
                   />
                   <p className="text-xs text-slate-500 mt-1">Minimum points balance required to claim a discount.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex items-center mb-6">
+                <Gift className="w-5 h-5 text-amber-600 mr-3" />
+                <h2 className="text-lg font-semibold text-slate-900">Referral & Campus Ambassador Payout Settings</h2>
+              </div>
+              <div className="border-t border-slate-200 pt-6 grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Default Buyer Discount (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="referralBuyerDiscount"
+                    value={settings.referralBuyerDiscount}
+                    onChange={handleChange}
+                    step="0.50"
+                    min="0"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Fixed discount buyers get when applying a student referral code (and default for new ambassador codes).</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Default Commission / Order (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="referralCommissionPerOrder"
+                    value={settings.referralCommissionPerOrder}
+                    onChange={handleChange}
+                    step="0.50"
+                    min="0"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Cash commission earned by a student referrer per confirmed paid order.</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Minimum Payout Threshold (GH₵)
+                  </label>
+                  <input
+                    type="number"
+                    name="referralMinPayoutAmount"
+                    value={settings.referralMinPayoutAmount}
+                    onChange={handleChange}
+                    step="1.00"
+                    min="0"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Minimum unpaid commission balance a student or ambassador must reach before admin payout is unlocked.</p>
                 </div>
               </div>
             </div>

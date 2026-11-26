@@ -283,7 +283,7 @@ export default function Home() {
                         <span className="text-xs font-black px-2.5 py-1 rounded-md bg-blue-500/20 text-blue-300 border border-blue-500/30 font-mono">
                           {item.badge}
                         </span>
-                        <span className="text-3xl font-black text-slate-700 group-hover:text-emerald-400/30 transition-colors">
+                        <span className="text-3xl font-black text-white group-hover:text-emerald-400 transition-colors">
                           {item.step}
                         </span>
                       </div>

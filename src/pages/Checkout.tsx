@@ -44,6 +44,7 @@ export default function Checkout() {
   const [deliveryPhone, setDeliveryPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [promoCode, setPromoCode] = useState('');
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
   const [promoDiscount, setPromoDiscount] = useState(0);
   const [promoError, setPromoError] = useState('');
   const [promoSuccess, setPromoSuccess] = useState('');
@@ -313,14 +314,8 @@ export default function Checkout() {
       // Cap discount at subtotal
       discount = Math.min(discount, subtotal);
 
-      // Increment current_uses
-      const { error: updateError } = await supabase
-        .from('promo_codes')
-        .update({ current_uses: (promo.current_uses || 0) + 1 })
-        .eq('id', promo.id);
-
-      if (updateError) throw updateError;
-
+      // Usage count is incremented atomically inside place_order RPC on submit
+      setAppliedPromoCode(promo.code);
       setPromoDiscount(discount);
       setPromoSuccess(`Promo applied! You save GH₵ ${discount.toFixed(2)}`);
       setPromoCode('');
@@ -412,7 +407,8 @@ export default function Checkout() {
         p_delivery_fee: finalDeliveryCost,
         p_use_points: usePoints,
         p_points_to_use: pointsToUse,
-        p_points_earned: pointsEarned
+        p_points_earned: pointsEarned,
+        p_promo_code: appliedPromoCode
       });
 
       if (rpcError) throw rpcError;

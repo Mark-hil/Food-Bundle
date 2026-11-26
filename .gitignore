@@ -25,3 +25,8 @@ food@bundle1
 paystack.txt 
 how-to-set-resend.txt
 roles implementation.txt
+scratch/
+test-supabase.js
+test.js
+test.mjs
+fix_subs.js

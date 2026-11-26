@@ -20,7 +20,8 @@ import {
   CreditCard, 
   PackageCheck,
   Truck,
-  Gift
+  Gift,
+  Tag
 } from 'lucide-react';
 import LocationZoneSelector, { DeliveryZone } from '../components/checkout/LocationZoneSelector';
 
@@ -49,6 +50,12 @@ export default function GuestCheckout() {
   const [error, setError] = useState('');
   const [deliveryFee, setDeliveryFee] = useState(10);
   const [freeDeliveryThreshold, setFreeDeliveryThreshold] = useState(700);
+  const [customItems, setCustomItems] = useState<string[]>([]);
+  const [promoCode, setPromoCode] = useState('');
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoError, setPromoError] = useState('');
+  const [promoSuccess, setPromoSuccess] = useState('');
 
   // Delivery Zones 2-Tier State
   const [deliveryZones, setDeliveryZones] = useState<DeliveryZone[]>([]);
@@ -62,6 +69,24 @@ export default function GuestCheckout() {
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
     const bundleId = urlParams.get('bundle');
+    const customParam = urlParams.get('custom');
+    const promoParam = urlParams.get('promo') || urlParams.get('ref');
+
+    if (promoParam && promoParam.trim()) {
+      setPromoCode(promoParam.trim().toUpperCase());
+    }
+
+    if (customParam) {
+      const stored = sessionStorage.getItem(`custom_bundle_${customParam}`);
+      if (stored) {
+        try {
+          setCustomItems(JSON.parse(stored));
+        } catch (e) {
+          console.error('Failed to parse custom items', e);
+        }
+      }
+    }
+
     if (bundleId) {
       loadBundle(bundleId);
       loadDeliveryZones();
@@ -70,6 +95,66 @@ export default function GuestCheckout() {
       navigate('/bundles');
     }
   }, []);
+
+  const applyPromoCode = async (codeOverride?: string, bundleOverride?: any) => {
+    const activeBundle = bundleOverride || bundle;
+    const targetCode = (codeOverride ?? promoCode).trim().toUpperCase();
+    if (!targetCode || !activeBundle) {
+      setPromoError('Please enter an ambassador or promo code');
+      return;
+    }
+
+    setPromoError('');
+    setPromoSuccess('');
+
+    try {
+      const { data: promo, error: promoErr } = await supabase
+        .from('promo_codes')
+        .select('*')
+        .eq('code', targetCode)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (promoErr) throw promoErr;
+
+      if (!promo) {
+        setPromoError('Invalid or inactive ambassador/promo code');
+        return;
+      }
+
+      if (promo.expires_at && new Date(promo.expires_at) < new Date()) {
+        setPromoError('This promo code has expired');
+        return;
+      }
+
+      if (promo.max_uses && promo.current_uses >= promo.max_uses) {
+        setPromoError('This promo code has reached its usage limit');
+        return;
+      }
+
+      const currentSubtotal = Number(activeBundle.price) * quantity;
+      if (promo.min_order_amount && currentSubtotal < promo.min_order_amount) {
+        setPromoError(`Minimum order amount of GH₵ ${promo.min_order_amount} required`);
+        return;
+      }
+
+      let discount = 0;
+      if (promo.discount_type === 'percentage') {
+        discount = currentSubtotal * (promo.discount_value / 100);
+      } else if (promo.discount_type === 'fixed') {
+        discount = promo.discount_value;
+      }
+      discount = Math.min(discount, currentSubtotal);
+
+      setAppliedPromoCode(promo.code);
+      setPromoDiscount(discount);
+      setPromoSuccess(`Code ${promo.code} applied! You save GH₵ ${discount.toFixed(2)}`);
+      setPromoCode('');
+    } catch (err) {
+      console.error('Error applying promo code:', err);
+      setPromoError('Failed to apply promo code');
+    }
+  };
 
   const loadBundle = async (bundleId: string) => {
     try {
@@ -86,6 +171,11 @@ export default function GuestCheckout() {
         return;
       }
       setBundle(data);
+      const urlParams = new URLSearchParams(window.location.search);
+      const promoParam = urlParams.get('promo') || urlParams.get('ref');
+      if (promoParam && promoParam.trim()) {
+        void applyPromoCode(promoParam.trim().toUpperCase(), data);
+      }
     } catch (error) {
       console.error('Error loading bundle:', error);
       navigate('/bundles');
@@ -211,7 +301,7 @@ export default function GuestCheckout() {
       const subtotal = Number(bundle.price) * quantity;
       const isFreeDelivery = subtotal >= freeDeliveryThreshold;
       const finalDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
-      const totalAmount = subtotal + finalDeliveryFee;
+      const totalAmount = Math.max(0, subtotal + finalDeliveryFee - promoDiscount);
 
       const { data: orderData, error: orderError } = await supabase
         .from('guest_orders')
@@ -230,6 +320,9 @@ export default function GuestCheckout() {
           status: 'pending',
           payment_status: 'pending',
           pickup_pin: Math.floor(1000 + Math.random() * 9000).toString(),
+          custom_items: customItems.length > 0 ? customItems : null,
+          promo_code: appliedPromoCode,
+          discount_amount: promoDiscount,
         })
         .select()
         .single();
@@ -269,7 +362,7 @@ export default function GuestCheckout() {
   const subtotal = Number(bundle.price) * quantity;
   const isFreeDelivery = subtotal >= freeDeliveryThreshold;
   const finalDeliveryFee = isFreeDelivery ? 0 : deliveryFee;
-  const totalAmount = subtotal + finalDeliveryFee;
+  const totalAmount = Math.max(0, subtotal + finalDeliveryFee - promoDiscount);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 py-10 px-4 sm:px-6">
@@ -625,6 +718,41 @@ export default function GuestCheckout() {
                     <span>-GH₵ {deliveryFee.toFixed(2)}</span>
                   </div>
                 )}
+
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-blue-300 font-bold bg-blue-500/10 px-3 py-1.5 rounded-lg border border-blue-500/20">
+                    <span className="flex items-center gap-1">
+                      <Tag className="w-3.5 h-3.5" />
+                      Code ({appliedPromoCode})
+                    </span>
+                    <span>-GH₵ {promoDiscount.toFixed(2)}</span>
+                  </div>
+                )}
+
+                {/* Ambassador / Promo Code Input */}
+                <div className="pt-3 border-t border-white/10">
+                  <label className="block text-[11px] font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                    Ambassador / Promo Code (Optional)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoCode}
+                      onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. KOFI10"
+                      className="flex-1 px-3 py-2 bg-slate-800/90 border border-white/15 text-white text-xs rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none uppercase font-mono"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => applyPromoCode()}
+                      className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-lg border border-white/15 transition"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                  {promoError && <p className="text-red-400 text-[11px] mt-1">{promoError}</p>}
+                  {promoSuccess && <p className="text-emerald-400 text-[11px] mt-1">{promoSuccess}</p>}
+                </div>
 
                 {/* Grand Total */}
                 <div className="border-t border-white/10 pt-4 mt-3 flex items-center justify-between">

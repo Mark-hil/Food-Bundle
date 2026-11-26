@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, ToggleLeft, ToggleRight, X, Percent } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, X, Percent, Users, CheckCircle2, AlertTriangle, Wallet, Lock } from 'lucide-react';
 
 interface PromoCode {
   id: string;
@@ -13,7 +13,16 @@ interface PromoCode {
   current_uses: number;
   expires_at: string | null;
   is_active: boolean;
+  ambassador_name?: string | null;
+  ambassador_phone?: string | null;
+  commission_per_order?: number;
+  commission_paid?: number;
   created_at: string;
+}
+
+interface AmbassadorOrderStats {
+  confirmedOrders: number;
+  referredRevenue: number;
 }
 
 interface FormData {
@@ -24,6 +33,9 @@ interface FormData {
   min_order_amount: string;
   max_uses: string;
   expires_at: string;
+  ambassador_name: string;
+  ambassador_phone: string;
+  commission_per_order: string;
 }
 
 const INITIAL_FORM: FormData = {
@@ -34,10 +46,17 @@ const INITIAL_FORM: FormData = {
   min_order_amount: '',
   max_uses: '',
   expires_at: '',
+  ambassador_name: '',
+  ambassador_phone: '',
+  commission_per_order: '',
 };
 
 export default function PromoCodes() {
   const [promoCodes, setPromoCodes] = useState<PromoCode[]>([]);
+  const [orderStatsByCode, setOrderStatsByCode] = useState<Record<string, AmbassadorOrderStats>>({});
+  const [defaultBuyerDiscount, setDefaultBuyerDiscount] = useState(10);
+  const [defaultCommission, setDefaultCommission] = useState(15);
+  const [minPayoutAmount, setMinPayoutAmount] = useState(45);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
@@ -53,13 +72,59 @@ export default function PromoCodes() {
   const loadPromoCodes = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('promo_codes')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [promosRes, regOrdersRes, guestOrdersRes, settingsRes] = await Promise.all([
+        supabase
+          .from('promo_codes')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('promo_code, total_amount, status')
+          .not('promo_code', 'is', null)
+          .not('status', 'in', '("pending","cancelled")'),
+        supabase
+          .from('guest_orders')
+          .select('promo_code, total_amount, status')
+          .not('promo_code', 'is', null)
+          .not('status', 'in', '("pending","cancelled")'),
+        supabase
+          .from('system_settings')
+          .select('referral_buyer_discount, referral_commission_per_order, referral_min_payout_amount')
+          .eq('id', 1)
+          .maybeSingle(),
+      ]);
 
-      if (error) throw error;
-      setPromoCodes(data || []);
+      if (promosRes.error) throw promosRes.error;
+      setPromoCodes(promosRes.data || []);
+
+      if (settingsRes.data) {
+        if (settingsRes.data.referral_buyer_discount != null) {
+          setDefaultBuyerDiscount(Number(settingsRes.data.referral_buyer_discount));
+        }
+        if (settingsRes.data.referral_commission_per_order != null) {
+          setDefaultCommission(Number(settingsRes.data.referral_commission_per_order));
+        }
+        if (settingsRes.data.referral_min_payout_amount != null) {
+          setMinPayoutAmount(Number(settingsRes.data.referral_min_payout_amount));
+        }
+      }
+
+      const statsMap: Record<string, AmbassadorOrderStats> = {};
+      const accumulate = (rows: any[] | null) => {
+        if (!rows) return;
+        for (const row of rows) {
+          const codeKey = String(row.promo_code || '').trim().toUpperCase();
+          if (!codeKey) continue;
+          if (!statsMap[codeKey]) {
+            statsMap[codeKey] = { confirmedOrders: 0, referredRevenue: 0 };
+          }
+          statsMap[codeKey].confirmedOrders += 1;
+          statsMap[codeKey].referredRevenue += Number(row.total_amount || 0);
+        }
+      };
+      accumulate(regOrdersRes.data);
+      accumulate(guestOrdersRes.data);
+      setOrderStatsByCode(statsMap);
     } catch (error) {
       console.error('Error loading promo codes:', error);
       setError('Failed to load promo codes');
@@ -110,6 +175,10 @@ export default function PromoCodes() {
         expires_at: formData.expires_at || null,
         is_active: true,
         current_uses: 0,
+        ambassador_name: formData.ambassador_name.trim() || null,
+        ambassador_phone: formData.ambassador_phone.trim() || null,
+        commission_per_order: formData.commission_per_order ? parseFloat(formData.commission_per_order) : 0,
+        commission_paid: 0,
       };
 
       const { data, error: insertError } = await supabase
@@ -167,6 +236,41 @@ export default function PromoCodes() {
     }
   };
 
+  const markCommissionPaid = async (promo: PromoCode, totalEarned: number, owed: number) => {
+    if (owed < minPayoutAmount) {
+      setError(`Payout blocked: ${promo.code} has GH₵ ${owed.toFixed(2)} owed, which is below the GH₵ ${minPayoutAmount.toFixed(2)} minimum payout threshold.`);
+      return;
+    }
+
+    try {
+      const { error: payErr } = await supabase
+        .from('promo_codes')
+        .update({ commission_paid: totalEarned })
+        .eq('id', promo.id);
+
+      if (payErr) throw payErr;
+      setPromoCodes(
+        promoCodes.map((p) => (p.id === promo.id ? { ...p, commission_paid: totalEarned } : p))
+      );
+      setSuccess(`Marked GH₵ ${totalEarned.toFixed(2)} paid for ${promo.code}`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error updating commission payout:', err);
+      setError('Failed to mark commission as paid');
+    }
+  };
+
+  const openCreateModal = () => {
+    setFormData({
+      ...INITIAL_FORM,
+      discount_type: 'fixed',
+      discount_value: defaultBuyerDiscount,
+      commission_per_order: defaultCommission.toString(),
+    });
+    setError('');
+    setShowModal(true);
+  };
+
   const isExpired = (expiresAt: string | null) => {
     if (!expiresAt) return false;
     return new Date(expiresAt) < new Date();
@@ -202,11 +306,89 @@ export default function PromoCodes() {
     );
   }
 
+  const payoutTotals = promoCodes.reduce(
+    (acc, promo) => {
+      const stats = orderStatsByCode[promo.code.toUpperCase()] || { confirmedOrders: 0, referredRevenue: 0 };
+      const rate = Number(promo.commission_per_order || 0);
+      const earned = stats.confirmedOrders * rate;
+      const paid = Number(promo.commission_paid || 0);
+      const owed = Math.max(0, earned - paid);
+      acc.paidOrders += stats.confirmedOrders;
+      acc.totalEarned += earned;
+      acc.totalOwed += owed;
+      if (owed >= minPayoutAmount && owed > 0) {
+        acc.eligibleCount += 1;
+        acc.eligibleOwed += owed;
+      } else if (owed > 0) {
+        acc.accumulatingCount += 1;
+      }
+      return acc;
+    },
+    { paidOrders: 0, totalEarned: 0, totalOwed: 0, eligibleCount: 0, eligibleOwed: 0, accumulatingCount: 0 }
+  );
+
   return (
     <div>
+      {/* Unpaid Referral & Ambassador Commissions Alert Banner */}
+      {payoutTotals.eligibleCount > 0 ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="p-2.5 bg-amber-100 text-amber-700 rounded-xl shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-amber-950 text-base">
+                Ready for Payout (Reached GH₵ {minPayoutAmount.toFixed(2)} Min): GH₵ {payoutTotals.eligibleOwed.toFixed(2)}
+              </h3>
+              <p className="text-sm text-amber-800 mt-0.5">
+                {payoutTotals.eligibleCount} referrer(s) have met the GH₵ {minPayoutAmount.toFixed(2)} minimum threshold and are eligible for MoMo payout.
+                {payoutTotals.accumulatingCount > 0 && ` (${payoutTotals.accumulatingCount} more still accumulating below threshold.)`}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 bg-white px-4 py-2.5 rounded-xl border border-amber-200 shrink-0">
+            <Wallet className="w-4 h-4 text-amber-700" />
+            <span className="text-sm font-extrabold text-amber-900">
+              {payoutTotals.paidOrders} Paid Referred Orders
+            </span>
+          </div>
+        </div>
+      ) : payoutTotals.totalOwed > 0 ? (
+        <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 mb-6 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Lock className="w-5 h-5 text-slate-500 shrink-0" />
+            <p className="text-sm text-slate-700">
+              <strong>GH₵ {payoutTotals.totalOwed.toFixed(2)}</strong> in accumulating commissions across {payoutTotals.accumulatingCount} referrer(s) — payout unlocks once a referrer reaches the <strong>GH₵ {minPayoutAmount.toFixed(2)}</strong> minimum threshold (configured in Admin Settings).
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {/* Commission Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid Referred Orders</p>
+          <p className="text-2xl font-extrabold text-slate-900 mt-1">{payoutTotals.paidOrders}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Commission Earned</p>
+          <p className="text-2xl font-extrabold text-emerald-700 mt-1">GH₵ {payoutTotals.totalEarned.toFixed(2)}</p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Eligible for Payout</p>
+          <p className={`text-2xl font-extrabold mt-1 ${payoutTotals.eligibleOwed > 0 ? 'text-amber-600' : 'text-slate-900'}`}>
+            GH₵ {payoutTotals.eligibleOwed.toFixed(2)}
+          </p>
+        </div>
+        <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Min Payout Threshold</p>
+          <p className="text-2xl font-extrabold text-blue-700 mt-1">GH₵ {minPayoutAmount.toFixed(2)}</p>
+        </div>
+      </div>
+
       <div className="flex justify-end mb-8">
         <button
-          onClick={() => setShowModal(true)}
+          onClick={openCreateModal}
           className="bg-green-600 hover:bg-green-700 text-white font-semibold px-6 py-3 rounded-xl transition flex items-center gap-2"
         >
           <Plus className="w-5 h-5" />
@@ -365,6 +547,53 @@ export default function PromoCodes() {
                 />
               </div>
 
+              <div className="pt-3 border-t border-slate-200 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-green-700 uppercase tracking-wider">
+                  <Users className="w-4 h-4" />
+                  <span>Campus Ambassador Payouts (Optional)</span>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Ambassador Name / Hall
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.ambassador_name}
+                    onChange={(e) => setFormData({ ...formData, ambassador_name: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50 text-sm"
+                    placeholder="e.g., Kofi Mensah (Unity Hall)"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      MoMo Phone
+                    </label>
+                    <input
+                      type="tel"
+                      value={formData.ambassador_phone}
+                      onChange={(e) => setFormData({ ...formData, ambassador_phone: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50 text-sm"
+                      placeholder="0244123456"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Commission / Order (GH₵)
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.commission_per_order}
+                      onChange={(e) => setFormData({ ...formData, commission_per_order: e.target.value })}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none bg-slate-50 text-sm"
+                      placeholder="e.g., 15"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="pt-4 border-t border-slate-200 flex gap-3">
                 <button
                   type="submit"
@@ -423,7 +652,7 @@ export default function PromoCodes() {
           <h3 className="text-lg font-semibold text-gray-900 mb-2">No promo codes yet</h3>
           <p className="text-gray-600 mb-4">Create your first promo code to get started.</p>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={openCreateModal}
             className="bg-green-600 hover:bg-green-700 text-white font-semibold px-4 py-2 rounded-xl transition inline-flex items-center gap-2"
           >
             <Plus className="w-5 h-5" />
@@ -439,6 +668,7 @@ export default function PromoCodes() {
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Code</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Description</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Discount</th>
+                  <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Ambassador & Commission</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Usage</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Status</th>
                   <th className="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wide">Expires</th>
@@ -472,6 +702,62 @@ export default function PromoCodes() {
                           Min: GH₵ {promo.min_order_amount.toFixed(2)}
                         </p>
                       )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {(() => {
+                        const stats = orderStatsByCode[promo.code.toUpperCase()] || { confirmedOrders: 0, referredRevenue: 0 };
+                        const rate = Number(promo.commission_per_order || 0);
+                        const earned = stats.confirmedOrders * rate;
+                        const paid = Number(promo.commission_paid || 0);
+                        const owed = Math.max(0, earned - paid);
+
+                        return (
+                          <div className="space-y-1 text-xs">
+                            {promo.ambassador_name ? (
+                              <p className="font-semibold text-gray-900">
+                                {promo.ambassador_name}
+                                {promo.ambassador_phone ? ` (${promo.ambassador_phone})` : ''}
+                              </p>
+                            ) : (
+                              <p className="text-gray-400">General promo</p>
+                            )}
+                            <p className="text-gray-600">
+                              Paid Orders: <span className="font-bold text-gray-900">{stats.confirmedOrders}</span>
+                              {stats.referredRevenue > 0 && (
+                                <span className="text-gray-500"> (GH₵ {stats.referredRevenue.toFixed(0)})</span>
+                              )}
+                            </p>
+                            {rate > 0 && (
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className={owed >= minPayoutAmount && owed > 0 ? 'text-amber-700 font-bold' : owed > 0 ? 'text-slate-700 font-semibold' : 'text-green-700 font-semibold'}>
+                                    Owed: GH₵ {owed.toFixed(2)}
+                                  </span>
+                                  <span className="text-gray-400">/ Earned: GH₵ {earned.toFixed(2)}</span>
+                                </div>
+                                {owed > 0 && owed >= minPayoutAmount && (
+                                  <button
+                                    type="button"
+                                    onClick={() => markCommissionPaid(promo, earned, owed)}
+                                    className="inline-flex items-center gap-1 bg-green-600 hover:bg-green-700 text-white px-2.5 py-1 rounded text-[11px] font-semibold transition"
+                                  >
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Mark Paid
+                                  </button>
+                                )}
+                                {owed > 0 && owed < minPayoutAmount && (
+                                  <div className="inline-flex items-center gap-1 bg-slate-100 text-slate-600 px-2 py-0.5 rounded text-[10px] font-medium border border-slate-200">
+                                    <Lock className="w-3 h-3 text-slate-400" />
+                                    <span>
+                                      Needs GH₵ {(minPayoutAmount - owed).toFixed(2)} more (min GH₵ {minPayoutAmount.toFixed(0)})
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </td>
                     <td className="px-6 py-4">
                       <div className="max-w-xs">

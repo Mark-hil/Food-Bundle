@@ -90,12 +90,6 @@ serve(async (req) => {
               })
               .eq('id', orderId);
           }
-
-          // Call RPC for any custom database triggers
-          await supabase.rpc('simulate_payment_success', {
-            p_order_id: orderId,
-            p_is_guest: !regOrder,
-          });
         } catch (dbErr) {
           console.error("Error updating order in database via webhook:", dbErr);
         }

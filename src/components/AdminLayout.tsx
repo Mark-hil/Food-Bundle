@@ -39,8 +39,8 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   const loadRecentOrders = async () => {
     try {
       const [regRes, guestRes] = await Promise.all([
-        supabase.from('orders').select('id, created_at, status, total_amount').order('created_at', { ascending: false }).limit(5),
-        supabase.from('guest_orders').select('id, created_at, status, total_amount').order('created_at', { ascending: false }).limit(5)
+        supabase.from('orders').select('id, created_at, status, total_amount, promo_code').order('created_at', { ascending: false }).limit(5),
+        supabase.from('guest_orders').select('id, created_at, status, total_amount, promo_code').order('created_at', { ascending: false }).limit(5)
       ]);
 
       const combined = [...(regRes.data || []), ...(guestRes.data || [])];
@@ -256,6 +256,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                                   </span>
                                 </div>
                                 <p className="text-sm font-medium text-slate-900">GH₵ {Number(order.total_amount).toFixed(2)}</p>
+                                {order.promo_code && (
+                                  <span className="inline-block mt-1 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                                    🎁 Code: {order.promo_code}
+                                  </span>
+                                )}
                                 <p className="text-xs text-slate-400 mt-1">{new Date(order.created_at).toLocaleTimeString()}</p>
                               </button>
                             ))}
@@ -308,6 +313,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <h4 className="text-sm font-bold text-slate-900">New Order Received!</h4>
               <p className="text-sm text-slate-600 truncate mt-0.5">Order #{toastOrder.id.slice(0,8).toUpperCase()}</p>
               <p className="text-xs font-medium text-emerald-600 mt-1">GH₵ {Number(toastOrder.total_amount).toFixed(2)}</p>
+              {toastOrder.promo_code && (
+                <p className="text-[11px] font-bold text-amber-700 mt-1">🎁 Referral/Promo: {toastOrder.promo_code}</p>
+              )}
             </div>
             <button 
               onClick={() => setToastOrder(null)}

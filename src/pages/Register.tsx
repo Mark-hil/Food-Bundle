@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Mail, Lock, Phone, ArrowRight, Eye, EyeOff, Package } from 'lucide-react';
+import { User, Mail, Lock, Phone, ArrowRight, Eye, EyeOff, Package, Gift } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from '../lib/navigation';
 
@@ -31,6 +31,7 @@ export default function Register() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [referralCode, setReferralCode] = useState<string>('');
   const { signUp } = useAuth();
 
   useEffect(() => {
@@ -39,10 +40,19 @@ export default function Register() {
     const nameParam = params.get('name');
     const phoneParam = params.get('phone');
     const redirectParam = params.get('redirect');
+    const refParam = params.get('ref');
 
     if (emailParam) setEmail(emailParam);
     if (nameParam) setFullName(nameParam);
     if (phoneParam) setPhone(phoneParam);
+    if (refParam && refParam.trim()) {
+      const normalizedRef = refParam.trim().toUpperCase();
+      setReferralCode(normalizedRef);
+      localStorage.setItem('foodbundle_ref', normalizedRef);
+    } else {
+      const savedRef = localStorage.getItem('foodbundle_ref');
+      if (savedRef) setReferralCode(savedRef);
+    }
     if (redirectParam && redirectParam.includes('/track/')) {
       const parts = redirectParam.split('/track/');
       if (parts[1]) setTrackingOrderId(parts[1].slice(0, 8).toUpperCase());
@@ -66,12 +76,13 @@ export default function Register() {
       return;
     }
 
-    const { error } = await signUp(email, password, fullName, phone);
+    const { error } = await signUp(email, password, fullName, phone, referralCode || undefined);
 
     if (error) {
       setError(error.message);
       setLoading(false);
     } else {
+      localStorage.removeItem('foodbundle_ref');
       setSuccess(true);
       setLoading(false);
     }
@@ -93,6 +104,19 @@ export default function Register() {
                 <div className="text-xs">
                   <p className="font-bold text-white">Track Order #{trackingOrderId}</p>
                   <p className="text-slate-300">Set your password to track live delivery and driver ETA.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Referral banner if arriving via ?ref=CODE */}
+            {referralCode && !success && (
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-3.5 mb-4 flex items-center gap-3">
+                <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                  <Gift size={18} />
+                </div>
+                <div className="text-xs">
+                  <p className="font-bold text-white">Referral Code Applied: <span className="font-mono text-emerald-400">{referralCode}</span></p>
+                  <p className="text-slate-300">Your friend earns bonus points after your first order.</p>
                 </div>
               </div>
             )}

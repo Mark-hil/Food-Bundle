@@ -1,4 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,6 +13,13 @@ interface PaymentRequest {
   amount?: number;
   orderId?: string;
   reference?: string;
+}
+
+function getSupabaseAdmin() {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL");
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey);
 }
 
 Deno.serve(async (req: Request) => {
@@ -30,6 +38,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: PaymentRequest = await req.json();
+    const supabaseAdmin = getSupabaseAdmin();
 
     if (body.action === "verify") {
       if (!body.reference) {
@@ -62,11 +71,49 @@ Deno.serve(async (req: Request) => {
         verifyData?.status === true &&
         verifyData?.data?.status === "success";
 
+      const resolvedOrderId = body.orderId || verifyData?.data?.metadata?.orderId;
+      const verifiedReference = verifyData?.data?.reference || body.reference;
+
+      // Authoritative server-side confirmation using service_role once Paystack confirms payment
+      if (isPaid && supabaseAdmin && resolvedOrderId) {
+        try {
+          const { data: regOrder } = await supabaseAdmin
+            .from("orders")
+            .select("id")
+            .eq("id", resolvedOrderId)
+            .maybeSingle();
+
+          if (regOrder) {
+            await Promise.all([
+              supabaseAdmin
+                .from("orders")
+                .update({ status: "confirmed" })
+                .eq("id", resolvedOrderId),
+              supabaseAdmin
+                .from("transactions")
+                .update({ status: "success", payment_reference: verifiedReference })
+                .eq("order_id", resolvedOrderId),
+            ]);
+          } else {
+            await supabaseAdmin
+              .from("guest_orders")
+              .update({
+                status: "confirmed",
+                payment_status: "success",
+                payment_reference: verifiedReference,
+              })
+              .eq("id", resolvedOrderId);
+          }
+        } catch (dbErr) {
+          console.error("Error updating order after verification:", dbErr);
+        }
+      }
+
       return new Response(
         JSON.stringify({
           verified: isPaid,
           status: verifyData?.data?.status || "failed",
-          reference: verifyData?.data?.reference || body.reference,
+          reference: verifiedReference,
           amount: verifyData?.data?.amount ? verifyData.data.amount / 100 : undefined,
         }),
         {
@@ -94,7 +141,25 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const amountInKobo = Math.round(amount * 100);
+    // Read authoritative total_amount from DB when service_role is available to prevent price tampering
+    let authoritativeAmount = Number(amount);
+    if (supabaseAdmin) {
+      try {
+        const [{ data: regOrder }, { data: guestOrder }] = await Promise.all([
+          supabaseAdmin.from("orders").select("total_amount").eq("id", orderId).maybeSingle(),
+          supabaseAdmin.from("guest_orders").select("total_amount").eq("id", orderId).maybeSingle(),
+        ]);
+        const dbAmount = Number(regOrder?.total_amount ?? guestOrder?.total_amount ?? 0);
+        if (dbAmount > 0) {
+          authoritativeAmount = dbAmount;
+        }
+      } catch (lookupErr) {
+        console.warn("Could not look up DB order amount, using client amount:", lookupErr);
+      }
+    }
+
+    const amountInKobo = Math.round(authoritativeAmount * 100);
+    const reference = `ORDER-${orderId}-${Date.now()}`;
 
     const paystackResponse = await fetch(
       "https://api.paystack.co/transaction/initialize",
@@ -109,7 +174,7 @@ Deno.serve(async (req: Request) => {
           amount: amountInKobo,
           currency: "GHS",
           channels: ["mobile_money", "card"],
-          reference: `ORDER-${orderId}-${Date.now()}`,
+          reference,
           callback_url: `${req.headers.get("origin")}/payment/success?order=${orderId}`,
           metadata: {
             orderId,
