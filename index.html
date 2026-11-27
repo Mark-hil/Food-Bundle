@@ -29,14 +29,15 @@
     <link rel="preconnect" href="https://api.paystack.co">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Google Analytics Placeholder (Replace G-XXXXXXXXXX with your actual Measurement ID) -->
+    <!-- Google Analytics (Only track production visitors, skip localhost/127.0.0.1 dev testing) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-GV8EGWZQBJ"></script>
     <script>
       window.dataLayer = window.dataLayer || [];
       function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-
-      gtag('config', 'G-GV8EGWZQBJ');
+      if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+        gtag('js', new Date());
+        gtag('config', 'G-GV8EGWZQBJ');
+      }
     </script>
   </head>
   <body>

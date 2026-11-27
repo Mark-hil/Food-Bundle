@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Plus, Trash2, ToggleLeft, ToggleRight, X, Percent, Users, CheckCircle2, AlertTriangle, Wallet, Lock } from 'lucide-react';
+import { Plus, Trash2, ToggleLeft, ToggleRight, X, Percent, Users, CheckCircle2, AlertTriangle, Wallet, Lock, Save, Edit2 } from 'lucide-react';
 
 interface PromoCode {
   id: string;
@@ -57,6 +57,8 @@ export default function PromoCodes() {
   const [defaultBuyerDiscount, setDefaultBuyerDiscount] = useState(10);
   const [defaultCommission, setDefaultCommission] = useState(15);
   const [minPayoutAmount, setMinPayoutAmount] = useState(45);
+  const [savingRules, setSavingRules] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM);
@@ -165,7 +167,7 @@ export default function PromoCodes() {
     setSubmitting(true);
 
     try {
-      const insertData = {
+      const payloadData = {
         code: formData.code.toUpperCase().trim(),
         description: formData.description.trim(),
         discount_type: formData.discount_type,
@@ -173,30 +175,46 @@ export default function PromoCodes() {
         min_order_amount: formData.min_order_amount ? parseFloat(formData.min_order_amount) : null,
         max_uses: formData.max_uses ? parseInt(formData.max_uses) : null,
         expires_at: formData.expires_at || null,
-        is_active: true,
-        current_uses: 0,
         ambassador_name: formData.ambassador_name.trim() || null,
         ambassador_phone: formData.ambassador_phone.trim() || null,
         commission_per_order: formData.commission_per_order ? parseFloat(formData.commission_per_order) : 0,
-        commission_paid: 0,
       };
 
-      const { data, error: insertError } = await supabase
-        .from('promo_codes')
-        .insert(insertData)
-        .select()
-        .single();
+      if (editingId) {
+        const { data, error: updateError } = await supabase
+          .from('promo_codes')
+          .update(payloadData)
+          .eq('id', editingId)
+          .select()
+          .single();
 
-      if (insertError) throw insertError;
+        if (updateError) throw updateError;
+        setPromoCodes(promoCodes.map((p) => (p.id === editingId ? data : p)));
+        setSuccess('Ambassador / promo code updated successfully!');
+      } else {
+        const { data, error: insertError } = await supabase
+          .from('promo_codes')
+          .insert({
+            ...payloadData,
+            is_active: true,
+            current_uses: 0,
+            commission_paid: 0,
+          })
+          .select()
+          .single();
 
-      setPromoCodes([data, ...promoCodes]);
+        if (insertError) throw insertError;
+        setPromoCodes([data, ...promoCodes]);
+        setSuccess('Promo code created successfully!');
+      }
+
       setFormData(INITIAL_FORM);
+      setEditingId(null);
       setShowModal(false);
-      setSuccess('Promo code created successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (error: any) {
-      console.error('Error creating promo code:', error);
-      setError(error.message || 'Failed to create promo code');
+      console.error('Error saving promo code:', error);
+      setError(error.message || 'Failed to save promo code');
     } finally {
       setSubmitting(false);
     }
@@ -261,6 +279,7 @@ export default function PromoCodes() {
   };
 
   const openCreateModal = () => {
+    setEditingId(null);
     setFormData({
       ...INITIAL_FORM,
       discount_type: 'fixed',
@@ -269,6 +288,60 @@ export default function PromoCodes() {
     });
     setError('');
     setShowModal(true);
+  };
+
+  const openEditModal = (promo: PromoCode) => {
+    setEditingId(promo.id);
+    setFormData({
+      code: promo.code,
+      description: promo.description || '',
+      discount_type: promo.discount_type,
+      discount_value: Number(promo.discount_value || 0),
+      min_order_amount: promo.min_order_amount != null ? String(promo.min_order_amount) : '',
+      max_uses: promo.max_uses != null ? String(promo.max_uses) : '',
+      expires_at: promo.expires_at ? promo.expires_at.slice(0, 10) : '',
+      ambassador_name: promo.ambassador_name || '',
+      ambassador_phone: promo.ambassador_phone || '',
+      commission_per_order: promo.commission_per_order != null ? String(promo.commission_per_order) : '0',
+    });
+    setError('');
+    setShowModal(true);
+  };
+
+  const saveGlobalCommissionRules = async () => {
+    setSavingRules(true);
+    setError('');
+    setSuccess('');
+    try {
+      const { error: settingsErr } = await supabase
+        .from('system_settings')
+        .update({
+          referral_buyer_discount: Number(defaultBuyerDiscount),
+          referral_commission_per_order: Number(defaultCommission),
+          referral_min_payout_amount: Number(minPayoutAmount),
+        })
+        .eq('id', 1);
+
+      if (settingsErr) throw settingsErr;
+
+      // Sync existing auto-generated student referral codes to match updated buyer discount & commission
+      await supabase
+        .from('promo_codes')
+        .update({
+          discount_value: Number(defaultBuyerDiscount),
+          commission_per_order: Number(defaultCommission),
+        })
+        .ilike('description', 'Student Referral Code%');
+
+      await loadPromoCodes();
+      setSuccess('Global referral discount, commission, and minimum payout threshold saved!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Error saving commission rules:', err);
+      setError(err.message || 'Failed to save commission rules. Make sure migrations are pushed (npm run db:push).');
+    } finally {
+      setSavingRules(false);
+    }
   };
 
   const isExpired = (expiresAt: string | null) => {
@@ -364,6 +437,77 @@ export default function PromoCodes() {
         </div>
       ) : null}
 
+      {/* Global Student & Campus Ambassador Commission Rules Editor */}
+      <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <Users className="w-5 h-5 text-green-600" />
+              Student Referral & Campus Ambassador Commission Rules
+            </h2>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Set the default buyer discount, cash commission per paid order, and minimum payout threshold for all student referrers and ambassadors.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={saveGlobalCommissionRules}
+            disabled={savingRules}
+            className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition flex items-center gap-2 self-start sm:self-auto disabled:opacity-50"
+          >
+            <Save className="w-4 h-4 text-emerald-400" />
+            {savingRules ? 'Saving...' : 'Save Commission Rules'}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Default Buyer Discount (GH₵)
+            </label>
+            <input
+              type="number"
+              value={defaultBuyerDiscount}
+              onChange={(e) => setDefaultBuyerDiscount(parseFloat(e.target.value) || 0)}
+              step="0.50"
+              min="0"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold text-slate-900 focus:ring-2 focus:ring-green-500 outline-none"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">Discount buyers get when using a referral code</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Default Commission / Order (GH₵)
+            </label>
+            <input
+              type="number"
+              value={defaultCommission}
+              onChange={(e) => setDefaultCommission(parseFloat(e.target.value) || 0)}
+              step="0.50"
+              min="0"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold text-emerald-700 focus:ring-2 focus:ring-green-500 outline-none"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">Earned by student/ambassador per confirmed order</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">
+              Minimum Payout Threshold (GH₵)
+            </label>
+            <input
+              type="number"
+              value={minPayoutAmount}
+              onChange={(e) => setMinPayoutAmount(parseFloat(e.target.value) || 0)}
+              step="1.00"
+              min="0"
+              className="w-full px-3 py-2 border border-slate-200 rounded-xl bg-slate-50 text-sm font-bold text-blue-700 focus:ring-2 focus:ring-green-500 outline-none"
+            />
+            <p className="text-[11px] text-slate-500 mt-1">Amount referrer must reach before payout is allowed</p>
+          </div>
+        </div>
+      </div>
+
       {/* Commission Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
@@ -412,10 +556,13 @@ export default function PromoCodes() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white border-b border-slate-200 p-6 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-gray-900">Create Promo Code</h2>
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingId ? 'Edit Ambassador / Promo Code' : 'Create Promo Code'}
+              </h2>
               <button
                 onClick={() => {
                   setShowModal(false);
+                  setEditingId(null);
                   setFormData(INITIAL_FORM);
                   setError('');
                 }}
@@ -600,12 +747,13 @@ export default function PromoCodes() {
                   disabled={submitting}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {submitting ? 'Creating...' : 'Create Code'}
+                  {submitting ? 'Saving...' : editingId ? 'Save Changes' : 'Create Code'}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setShowModal(false);
+                    setEditingId(null);
                     setFormData(INITIAL_FORM);
                     setError('');
                   }}
@@ -787,6 +935,13 @@ export default function PromoCodes() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-3">
+                        <button
+                          onClick={() => openEditModal(promo)}
+                          className="text-blue-600 hover:text-blue-800 transition"
+                          title="Edit commission & details"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => toggleActive(promo.id, promo.is_active)}
                           className="text-gray-400 hover:text-gray-600 transition"

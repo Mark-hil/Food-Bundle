@@ -2,9 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from '../../lib/navigation';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
-import { Search, Users, ShieldCheck, Truck, GraduationCap, PackageCheck, Headset, Crown } from 'lucide-react';
+import { Search, Users, ShieldCheck, Truck, GraduationCap, PackageCheck, Headset, Crown, ShoppingBag } from 'lucide-react';
 
-type RoleTab = 'all' | 'admin' | 'super_admin' | 'student' | 'driver' | 'support' | 'packer';
+type RoleTab = 'all' | 'admin' | 'super_admin' | 'student' | 'driver' | 'support' | 'packer' | 'guest';
 
 interface RoleConfig {
   key: RoleTab;
@@ -72,6 +72,14 @@ const ROLE_TABS: RoleConfig[] = [
     dotClass: 'bg-teal-500',
     activeClass: 'border-teal-600 text-teal-700',
   },
+  {
+    key: 'guest',
+    label: 'Guest Buyers',
+    icon: ShoppingBag,
+    badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+    dotClass: 'bg-emerald-500',
+    activeClass: 'border-emerald-600 text-emerald-700',
+  },
 ];
 
 export default function Students() {
@@ -90,28 +98,54 @@ export default function Students() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error: queryError } = await supabase
-        .from('profiles')
-        .select('id, email, full_name, role, phone, created_at')
-        .order('created_at', { ascending: false });
+      const [profilesRes, ordersRes, guestOrdersRes] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, email, full_name, role, phone, created_at')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('student_id'),
+        supabase
+          .from('guest_orders')
+          .select('id, full_name, email, phone, created_at')
+          .order('created_at', { ascending: false }),
+      ]);
 
-      if (queryError) throw queryError;
-      setUsers(data || []);
+      if (profilesRes.error) throw profilesRes.error;
+      const registeredUsers = profilesRes.data || [];
 
-      // Fetch order counts for each user
-      if (data && data.length > 0) {
-        const counts: { [key: string]: number } = {};
-        for (const user of data) {
-          const { count, error: countError } = await supabase
-            .from('orders')
-            .select('id', { count: 'exact', head: true })
-            .eq('student_id', user.id);
-          if (!countError) {
-            counts[user.id] = count || 0;
-          }
+      const counts: { [key: string]: number } = {};
+      for (const ord of ordersRes.data || []) {
+        if (ord.student_id) {
+          counts[ord.student_id] = (counts[ord.student_id] || 0) + 1;
         }
-        setOrderCounts(counts);
       }
+
+      // Group guest_orders by unique phone/email so Guest Buyers are visible to admins too
+      const guestMap = new Map<string, any>();
+      for (const g of guestOrdersRes.data || []) {
+        const key = (g.phone || g.email || g.id).trim().toLowerCase();
+        if (!guestMap.has(key)) {
+          const syntheticId = `guest:${key}`;
+          guestMap.set(key, {
+            id: syntheticId,
+            email: g.email && !g.email.endsWith('@guest.food-bundle.com') ? g.email : 'Guest Checkout (No Email)',
+            full_name: g.full_name || 'Guest Customer',
+            role: 'guest',
+            phone: g.phone || '',
+            created_at: g.created_at,
+            is_guest: true,
+          });
+          counts[syntheticId] = 1;
+        } else {
+          const existing = guestMap.get(key);
+          counts[existing.id] = (counts[existing.id] || 0) + 1;
+        }
+      }
+
+      setUsers([...registeredUsers, ...Array.from(guestMap.values())]);
+      setOrderCounts(counts);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -128,7 +162,7 @@ export default function Students() {
   });
 
   const getRoleCounts = () => {
-    const counts: Record<RoleTab, number> = { all: users.length, admin: 0, super_admin: 0, student: 0, driver: 0, support: 0, packer: 0 };
+    const counts: Record<RoleTab, number> = { all: users.length, admin: 0, super_admin: 0, student: 0, driver: 0, support: 0, packer: 0, guest: 0 };
     users.forEach(u => {
       const role = u.role as RoleTab;
       if (role in counts) counts[role]++;
@@ -325,12 +359,21 @@ export default function Students() {
                         </span>
                       </td>
                       <td className="p-4 pr-6 text-right">
-                        <button
-                          onClick={() => navigate(`/admin/students/${user.id}`)}
-                          className="inline-flex items-center px-3.5 py-1.5 text-xs font-medium rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
-                        >
-                          View Details
-                        </button>
+                        {user.is_guest ? (
+                          <button
+                            onClick={() => navigate('/admin/orders')}
+                            className="inline-flex items-center px-3.5 py-1.5 text-xs font-medium rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 hover:bg-emerald-100 shadow-sm transition-all"
+                          >
+                            View Guest Orders
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => navigate(`/admin/students/${user.id}`)}
+                            className="inline-flex items-center px-3.5 py-1.5 text-xs font-medium rounded-lg bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300 shadow-sm transition-all"
+                          >
+                            View Details
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
